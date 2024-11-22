@@ -55,8 +55,8 @@ T1=-ei
 Tt2=eo2.outer(ei1)+ei2.outer(eo1)
 Tt4=-4*eo
 
-    dSq=R*R-r*r
 def toroid(R,r):
+    dSq=R*R-r*r
     return Tt4+2*Tt2*dSq+T1*dSq*dSq-4*R*R*(Txx+Tyy)
 
 def CGA1_Translator(x,y,z):
