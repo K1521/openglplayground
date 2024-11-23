@@ -122,10 +122,10 @@ class OpNode:
         return NegNode([self])
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({', '.join(map(str, self.parents))})"
+        return f"{self.__class__.__name__.removesuffix('Node')}({', '.join(map(str, self.parents))})"
 
     def nodedef(self,parentnames):
-        return f"{self.__class__.__name__}({', '.join(parentnames)})"
+        return f"{self.__class__.__name__.removesuffix('Node')}({', '.join(parentnames)})"
     
     def _copy_op(self):
         return type(self)([])
@@ -143,21 +143,19 @@ class OpNode:
     def constelimination(self):
         return self
     
-    def simplify(self,nodesigcash=None,nodecash=None,issimplified=False):
-        global calls
-        calls+=1
-        if calls==20000:
-            pass
-        #if children is None:children=dict()#node->set(node.children)
+    
+    def normalizenode(self):
+        return self
+
+    def replacenode(self,f,nodesigcash=None,nodecash=None,issimplified=False):
         if nodesigcash is None:nodesigcash=dict()#node.signature()->node
         if nodecash is None:nodecash=dict()
-        #if children is None:children=dict()
-        #if visited is None:visited=set()#node #can replaced by children dict
+
 
         cashednode=nodecash.get(self,None)
         if cashednode is not None:return cashednode
 
-        self.parents=[p.simplify(nodesigcash,nodecash)  for p in self.parents]
+        self.parents=[p.replacenode(f,nodesigcash,nodecash,issimplified)  for p in self.parents]
         sig=self.signature()
         cashednode=nodesigcash.get(sig,None)
         if cashednode is not None:return cashednode
@@ -165,9 +163,9 @@ class OpNode:
         if issimplified:
             simplified=self
         else:
-            simplified=self.constelimination()
+            simplified=f(self)
             if simplified!=self:
-                simplified=simplified.simplify(nodesigcash,nodecash,issimplified=True)
+                simplified=simplified.replacenode(f,nodesigcash,nodecash,issimplified=True)
 
 
         nodecash[self]=simplified
@@ -181,7 +179,7 @@ class EndpointNode(OpNode):
     """
     Represents an addition operation in the computation graph.
     """
-    def subexpressionelimination(self):
+    def subexpressionelimination(self):#TODO speedtest
         nodes,children=self.topsortwithchildren()
 
         sigtonode=dict()#repr->node
@@ -196,41 +194,30 @@ class EndpointNode(OpNode):
             #print(list(sigtonode.values())[-1].asplanstr())
         return list(sigtonode.values())
     
- 
-    
-    
-    # def simplify(self):
-    #     nodes,children=self.topsortwithchildren()
-
-    #     sigtonode=dict()#repr->node
-    #     for n in nodes:
-    #         sig=n.signature()
-    #         cashednode=sigtonode.get(sig,None)
-    #         if cashednode is None:#if the node isnt cashed
-    #             nsimplified=n.constelimination()
-    #             #nsimplified.parents=
-                
-    #             sigsimplified=nsimplified.signature()
-
-    #             if sigsimplified==ConstNode(16).signature():
-    #                 pass
-
-    #             cashednode=sigtonode.get(sigsimplified,None)
-    #             if cashednode is None:#if simplified and node isnt cashed
-    #                 sigtonode[sigsimplified] = nsimplified
-    #                 sigtonode[sig] = nsimplified
-    #             else:
-    #                 #sigtonode[sigsimplified] = cashednode #already in cash
-    #                 sigtonode[sig] = cashednode
+    def mergenodes(self):
+        nodes,children=self.topsortwithchildren()
+        mergables=set(k for k,v in children.items() if len(v)==1 )
+        
+        def nodemerger(node):
+            for Nodetype in [AddNode,MulNode]:
+                if isinstance(node,Nodetype):
+                    newparents=[]
+                    mergedone=False
+                    for p in node.parents:
+                        if isinstance(p,Nodetype) and p in mergables:
+                            newparents.extend(p.parents)
+                            mergedone=True
+                        else:
+                            newparents.append(p)
+                    if mergedone==False:return node
+                    newnode=Nodetype(newparents) 
+                    if node in mergables:
+                        mergables.add(newnode)
+                    return newnode
+            return node
+        self.replacenode(nodemerger)
 
 
-    #         if cashednode is not None:#replace n with cashed
-    #             for c in children[n]:
-    #                 c.parents= [cashednode if p is n else p for p in c.parents]
-    #             #children[samenode]+=children[n]#not neccesary
-    #             #del children[n]
-    #     return list(sigtonode.values())    
-   
 
 class ConstNode(OpNode):
     """
@@ -344,6 +331,8 @@ class SubNode(OpNode):
         if isinstance(self.parents[0],ConstNode) and self.parents[0].value==0: 
             return NegNode([self.parents[1]])
         return self
+    def normalizenode(self):
+        return AddNode([self.parents[0],MulNode([self.parents[1],-1])])
     
 class NegNode(OpNode):
     """
@@ -356,8 +345,19 @@ class NegNode(OpNode):
         if isinstance(self.parents[0],ConstNode):
             return ConstNode(-self.parents[0].value)
         return self
+    def normalizenode(self):
+        return MulNode([self.parents[0],-1])
 
-
+class InvNode(OpNode):
+    """
+    Represents a division operation in the computation graph.
+    """
+    def __repr__(self):
+        return f"Inv({self.parents[0]})"
+    def constelimination(self):
+        if isinstance(self.parents[0],ConstNode):
+            return ConstNode(1/self.parents[0].value)
+        return self
 class DivNode(OpNode):
     """
     Represents a division operation in the computation graph.
@@ -372,6 +372,8 @@ class DivNode(OpNode):
                 return ConstNode(self.parents[0].value/self.parents[1].value)
             #return MulNode([self.parents[0],1/self.parents[1].value])
         return self
+    def normalizenode(self):
+        return MulNode([self.parents[0],InvNode([self.parents[1]])])
 
 import cProfile
 import pstats
@@ -410,11 +412,22 @@ e=EndpointNode(iprod.blades.values())
 #e.subexpressionelimination()
 # import sys
 # sys.setrecursionlimit(10000)
-e=EndpointNode([fib(30),e])
-print(len(e.topological_sort()))
+#e=EndpointNode([fib(30),e])
+#print(len(e.topological_sort()))
 print(e.maxdepth())
-e.simplify()
-#e.subexpressionelimination()
+#e.simplify()
+e.replacenode(lambda x:x)#subexpressionelimination
+e.replacenode(lambda x:x.normalizenode())#normlization
+e.replacenode(lambda x:x.constelimination())#simplify
+e.mergenodes()
+
+def replacer(x):
+    d={"x":2,"y":3,"z":4}
+    if isinstance(x,VarNode):
+        return ConstNode(d.get(x.varname,0))
+    return x
+#e.replacenode(replacer)
+#e.replacenode(lambda x:x.constelimination())
 print(e.asplanstr())
 
 # a,b=1,1
@@ -425,4 +438,5 @@ print(e.asplanstr())
 # print((-ConstNode(1)).asplanstr())
 print(calls)
 
-
+iprod=dcga.point(2,3,4)^torus
+print(iprod.blades.values())
