@@ -80,6 +80,13 @@ class OpNode:
             for p in n.parents:
                 children[p].add(n)
         return nodes,children
+    def childcount(self):
+        nodes=self.topological_sort()
+        children={n:0 for n in nodes}
+        for n in nodes:
+            for p in n.parents:
+                children[p]+=1
+        return children
     
     def asplanstr(self):
         nodes=self.topological_sort()
@@ -90,6 +97,19 @@ class OpNode:
             #name=f"n{id(n)}"
             nodenames[n]=name
             nodestr.append(name+"="+n.nodedef(nodenames[p]for p in n.parents))
+        return "\n".join(nodestr)
+    def asplanstrcompact(self,compact=False):
+        nodes=self.topological_sort()
+        mergables=set(k for k,v in self.childcount().items() if v==1 )#nodes with 1 child
+        nodenames=dict()
+        nodestr=[]
+        for i,n in enumerate(nodes):
+            if n in mergables:
+                nodenames[n]=n.nodedef((nodenames[p]for p in n.parents),compact)
+            else:
+                name=f"n{i}" if compact else f"node{i}"
+                nodenames[n]=name
+                nodestr.append(name+"="+n.nodedef((nodenames[p]for p in n.parents),compact))
         return "\n".join(nodestr)
         
 
@@ -124,8 +144,9 @@ class OpNode:
     def __repr__(self):
         return f"{self.__class__.__name__.removesuffix('Node')}({', '.join(map(str, self.parents))})"
 
-    def nodedef(self,parentnames):
+    def nodedef(self,parentnames,small=False):
         return f"{self.__class__.__name__.removesuffix('Node')}({', '.join(parentnames)})"
+    
     
     def _copy_op(self):
         return type(self)([])
@@ -229,7 +250,8 @@ class ConstNode(OpNode):
 
     def __repr__(self):
         return f"Const({self.value})"
-    def nodedef(self,parentnames):
+    def nodedef(self,parentnames,small=False):
+        if small:return str(self.value)
         return self.__repr__()
     def _copy_op(self):
         return ConstNode(self.value)
@@ -247,7 +269,8 @@ class VarNode(OpNode):
 
     def __repr__(self):
         return f"Var({self.varname})"
-    def nodedef(self,parentnames):
+    def nodedef(self,parentnames,small=False):
+        if small:return str(self.varname)
         return self.__repr__()
     def _copy_op(self):
         return VarNode(self.varname)
@@ -260,6 +283,9 @@ class AddNode(OpNode):
     """
     Represents an addition operation in the computation graph.
     """
+    def nodedef(self,parentnames,small=False):
+        if small:return "("+"+".join(parentnames)+")"
+        return super().nodedef(parentnames)
 
     def __repr__(self):
         return f"Add({self.parents[0]}, {self.parents[1]})"
@@ -289,6 +315,9 @@ class MulNode(OpNode):
     """
     Represents a multiplication operation in the computation graph.
     """
+    def nodedef(self,parentnames,small=False):
+        if small:return "("+"*".join(parentnames)+")"
+        return super().nodedef(parentnames)
 
     # def __repr__(self):
     #     return f"Mul({self.parents[0]}, {self.parents[1]})"
@@ -318,7 +347,9 @@ class SubNode(OpNode):
     """
     Represents a subtraction operation in the computation graph.
     """
-
+    def nodedef(self,parentnames,small=False):
+        if small:return "("+"-".join(parentnames)+")"
+        return super().nodedef(parentnames)
     def __repr__(self):
         return f"Sub({self.parents[0]}, {self.parents[1]})"
     def constelimination(self):
@@ -338,7 +369,9 @@ class NegNode(OpNode):
     """
     Represents a subtraction operation in the computation graph.
     """
-
+    def nodedef(self,parentnames,small=False):
+        if small:return "-("+"?".join(parentnames)+")"
+        return super().nodedef(parentnames)
     def __repr__(self):
         return f"Neg({self.parents[0]})"
     def constelimination(self):
@@ -352,6 +385,9 @@ class InvNode(OpNode):
     """
     Represents a division operation in the computation graph.
     """
+    def nodedef(self,parentnames,small=False):
+        if small:return "1/("+"?".join(parentnames)+")"
+        return super().nodedef(parentnames)
     def __repr__(self):
         return f"Inv({self.parents[0]})"
     def constelimination(self):
@@ -362,6 +398,9 @@ class DivNode(OpNode):
     """
     Represents a division operation in the computation graph.
     """
+    def nodedef(self,parentnames,small=False):
+        if small:return "("+"/".join(parentnames)+")"
+        return super().nodedef(parentnames)
     def __repr__(self):
         return f"Div({self.parents[0]}, {self.parents[1]})"
     def constelimination(self):
@@ -420,6 +459,7 @@ e.replacenode(lambda x:x)#subexpressionelimination
 e.replacenode(lambda x:x.normalizenode())#normlization
 e.replacenode(lambda x:x.constelimination())#simplify
 e.mergenodes()
+e.replacenode(lambda x:x.constelimination())
 
 def replacer(x):
     d={"x":2,"y":3,"z":4}
@@ -429,7 +469,7 @@ def replacer(x):
 #e.replacenode(replacer)
 #e.replacenode(lambda x:x.constelimination())
 print(e.asplanstr())
-
+print(e.asplanstrcompact(True))
 # a,b=1,1
 # for i in range(30):
 #     print(b)
