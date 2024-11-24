@@ -414,69 +414,76 @@ class DivNode(OpNode):
     def normalizenode(self):
         return MulNode([self.parents[0],InvNode([self.parents[1]])])
 
-import cProfile
-import pstats
-from io import StringIO
-
-# Usage Example
-# x = VarNode("x")
-
-def fib(n):
-    if n==1 or n==2:return ConstNode(1)
-    return fib(n-1)+fib(n-2)
 
 
+if __name__=="__main__":
+    import sys
 
-# with cProfile.Profile() as profiler:
-#     c=fib(30)
-#     e=EndpointNode([c]).copy_graph(copydown=False)
-#     #print(e.asplanstr())
-#     print(len(e.topological_sort()))
-#     e.subexpressionelimination()
-#     print(e.asplanstr())
+    # Add your desired path
+    sys.path.append('./')
+    import cProfile
+    import pstats
+    from io import StringIO
 
-# # Output the profiling results
-# s = StringIO()
-# ps = pstats.Stats(profiler, stream=s)
-# ps.strip_dirs().sort_stats("tottime").print_stats(20)  # Top 20 by cumulative time
-# print(s.getvalue())
+    # Usage Example
+    # x = VarNode("x")
 
-import algebra.dcga as dcga
+    def fib(n):
+        if n==1 or n==2:return ConstNode(1)
+        return fib(n-1)+fib(n-2)
 
 
-point=dcga.point(VarNode("x"),VarNode("y"),VarNode("z"))
-torus=dcga.toroid(2,0.5)
-iprod=point^torus
-e=EndpointNode(iprod.blades.values())
-#e.subexpressionelimination()
-# import sys
-# sys.setrecursionlimit(10000)
-#e=EndpointNode([fib(30),e])
-#print(len(e.topological_sort()))
-print(e.maxdepth())
-#e.simplify()
-e.replacenode(lambda x:x)#subexpressionelimination
-e.replacenode(lambda x:x.normalizenode())#normlization
-e.replacenode(lambda x:x.constelimination())#simplify
-e.mergenodes()
-e.replacenode(lambda x:x.constelimination())
 
-def replacer(x):
-    d={"x":2,"y":3,"z":4}
-    if isinstance(x,VarNode):
-        return ConstNode(d.get(x.varname,0))
-    return x
-#e.replacenode(replacer)
-#e.replacenode(lambda x:x.constelimination())
-print(e.asplanstr())
-print(e.asplanstrcompact(True))
-# a,b=1,1
-# for i in range(30):
-#     print(b)
-#     a,b=a+b,a
-    
-# print((-ConstNode(1)).asplanstr())
-print(calls)
+    # with cProfile.Profile() as profiler:
+    #     c=fib(30)
+    #     e=EndpointNode([c]).copy_graph(copydown=False)
+    #     #print(e.asplanstr())
+    #     print(len(e.topological_sort()))
+    #     e.subexpressionelimination()
+    #     print(e.asplanstr())
 
-iprod=dcga.point(2,3,4)^torus
-print(iprod.blades.values())
+    # # Output the profiling results
+    # s = StringIO()
+    # ps = pstats.Stats(profiler, stream=s)
+    # ps.strip_dirs().sort_stats("tottime").print_stats(20)  # Top 20 by cumulative time
+    # print(s.getvalue())
+
+    import algebra.dcga as dcga
+
+
+    point=dcga.point(VarNode("x"),VarNode("y"),VarNode("z"))
+    torus=dcga.toroid(2,0.5)
+    iprod=point^torus
+    e=EndpointNode(iprod.blades.values())
+    #e.subexpressionelimination()
+    # import sys
+    # sys.setrecursionlimit(10000)
+    #e=EndpointNode([fib(30),e])
+    #print(len(e.topological_sort()))
+    print(e.maxdepth())
+    #e.simplify()
+    e.replacenode(lambda x:x)#subexpressionelimination
+    e.replacenode(lambda x:x.normalizenode())#normlization
+    e.replacenode(lambda x:x.constelimination())#simplify
+    e.mergenodes()
+    e.replacenode(lambda x:x.constelimination())
+
+    def replacer(x):
+        d={"x":2,"y":3,"z":4}
+        if isinstance(x,VarNode):
+            return ConstNode(d.get(x.varname,0))
+        return x
+    #e.replacenode(replacer)
+    #e.replacenode(lambda x:x.constelimination())
+    print(e.asplanstr())
+    print(e.asplanstrcompact(True))
+    # a,b=1,1
+    # for i in range(30):
+    #     print(b)
+    #     a,b=a+b,a
+        
+    # print((-ConstNode(1)).asplanstr())
+    print(calls)
+
+    iprod=dcga.point(2,3,4)^torus
+    print(iprod.blades.values())
