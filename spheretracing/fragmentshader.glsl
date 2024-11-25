@@ -6,7 +6,7 @@ uniform vec3 cameraPos;
 uniform vec3 lightPos;
 uniform float time;
 uniform vec2 windowsize;
-uniform vec3 lookat;
+uniform mat3 cameraMatrix;
 
 
 const float FOV=1;
@@ -24,17 +24,13 @@ float sum(vec3 v) {
     return v.x+v.y+v.z;
 }
 
-float scene(vec3 p) {
-    return min(sphere(p, 1.0),sphere(p-vec3(0.6,0.7,0.8), 1.0));
-    //return sphere(p, 1.0); // Animate the sphere
-    //return sphere(p - vec3(sin(time), cos(time), 0.0), 1.0); // Animate the sphere
-}
+float scene(vec3 p);
 
 
 vec3 normaltocol(vec3 normal){
     //return vec3(normal.x/2+0.5,normal.y/2+0.5,0.5-normal.z/2);
-    //return normal*vec2(1,-1).xxy/2+0.5;
-    return normal;
+    return normal*vec2(1,-1).xxy/2+0.5;
+    //return normal;
     //return normalize(pow((normal*vec2(1,-1).xxy+1)/2,vec3(1)));
 }
 /*
@@ -115,7 +111,7 @@ void main() {
     //color = vec4(vec2(uv), 0.0, 1.0); // Background
     //return;
     vec3 rayOrigin = cameraPos;
-    vec3 rayDir =getCam(cameraPos,lookat)* normalize(vec3(uv, FOV));
+    vec3 rayDir =cameraMatrix* normalize(vec3(uv, FOV));
 
 
     // Sphere tracing
@@ -130,6 +126,8 @@ void main() {
         float checker = 0.3 + 0.7 * mod(sum(floor(p * 4.0)), 2.0); // Alternates between 0.5 and 1.0
         //vec3 col=vec3(checker);
         vec3 col =getlight(p,rayDir,vec3(1)*checker);
+
+        //col=normaltocol(getNormal2(p,rayDir));
         col=pow(col,vec3(0.4545));//gamma correction
 
         color= vec4(col,1);
@@ -137,4 +135,12 @@ void main() {
     } else {
         color = vec4(0.0, 0.0, 0.0, 1.0); // Background
     }
+}
+
+
+//cutoff
+float scene(vec3 p){
+    return min(sphere(p, 1.0),sphere(p-vec3(0.6,0.7,0.8), 1.0));
+    //return sphere(p, 1.0); // Animate the sphere
+    //return sphere(p - vec3(sin(time), cos(time), 0.0), 1.0); // Animate the sphere
 }

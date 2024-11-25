@@ -88,7 +88,7 @@ class OpNode:
                 children[p]+=1
         return children
     
-    def asplanstr(self):
+    def asplanstr(self,compact=False):
         nodes=self.topological_sort()
         nodenames=dict()
         nodestr=[]
@@ -96,7 +96,7 @@ class OpNode:
             name=f"node{i}"
             #name=f"n{id(n)}"
             nodenames[n]=name
-            nodestr.append(name+"="+n.nodedef(nodenames[p]for p in n.parents))
+            nodestr.append(name+"="+n.nodedef((nodenames[p]for p in n.parents),compact))
         return "\n".join(nodestr)
     def asplanstrcompact(self,compact=False):
         nodes=self.topological_sort()
