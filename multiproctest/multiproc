@@ -1,0 +1,16 @@
+from multiprocessing import Process, Manager
+
+def monitor(shared_dict):
+    while True:
+        print(shared_dict)
+
+if __name__ == "__main__":
+    manager = Manager()
+    shared_dict = manager.dict({"variable1": 42, "variable2": "Hello"})
+
+    monitor_proc = Process(target=monitor, args=(shared_dict,))
+    monitor_proc.start()
+
+    # Main program
+    while True:
+        shared_dict["variable1"] += 1

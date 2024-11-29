@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 calls=0
 class OpNode:
     """
@@ -8,7 +10,7 @@ class OpNode:
        
 
     @staticmethod
-    def nodify(value):
+    def nodify(value)->"OpNode":
         """
         Converts a value into an appropriate node.
         Supports:
@@ -21,7 +23,7 @@ class OpNode:
             return ConstNode(value)
         raise TypeError(f"Unsupported type for nodify: {type(value)}")
     
-    def copy_graph(self,mapping=None,copydown=True):
+    def copy_graph(self,mapping=None):
         if mapping is None:
             mapping=dict()
 
@@ -30,8 +32,7 @@ class OpNode:
         new_node=mapping[self]=self._copy_op()
 
         # Recursively copy parents
-        new_node.parents = [parent.copy_graph(mapping,copydown) for parent in self.parents]
-
+        new_node.parents = [parent.copy_graph(mapping) for parent in self.parents]
 
         return new_node
 
@@ -49,7 +50,7 @@ class OpNode:
     #     return ordering
     
     
-    def topological_sort(self, visited=None, ordering=None):
+    def topological_sort(self, visited=None, ordering=None)->list["OpNode"]:
         if visited is None:visited=set()
         if ordering is None:ordering=[]
         if self in visited:
@@ -111,6 +112,30 @@ class OpNode:
                 nodenames[n]=name
                 nodestr.append(name+"="+n.nodedef((nodenames[p]for p in n.parents),compact))
         return "\n".join(nodestr)
+    
+    def backpropergation(self,variables=None):  
+        zero=ConstNode(0)
+        doutdnode=defaultdict(lambda:zero)
+        doutdnode[self]=ConstNode(1)#set derivative for output node
+        topsort=self.topological_sort()
+        for node in reversed(topsort):
+            node.backpropergationnode(doutdnode)#set derivative for other nodes
+        if variables is None:
+            return doutdnode
+        
+        #if the tree has different variable objects wich are the same variable combine them
+        sigtoderivs=defaultdict(set)
+        for n in topsort:
+            if isinstance(n,VarNode):
+                sigtoderivs[n.signature()].add(doutdnode[n])
+        def nodesum(nodes):
+            if len(nodes)==0:return zero
+            if len(nodes)==1:return next(iter(nodes))
+            return AddNode(nodes)
+
+        return [nodesum(sigtoderivs[v.signature()])for v in variables]
+        
+
         
 
 
@@ -125,11 +150,9 @@ class OpNode:
         """Overload the * operator."""
         return MulNode([self, other])
     def __rmul__(self, other):
-        """Overload the * operator."""
         return MulNode([other,self])
 
     def __sub__(self, other):
-        """Overload the - operator."""
         return SubNode([self, other])
     def __rsub__(self, other):
         """Overload the - operator."""
@@ -138,8 +161,13 @@ class OpNode:
     def __truediv__(self, other):
         """Overload the / operator."""
         return DivNode([self, other])
+    
     def __neg__(self):
         return NegNode([self])
+    def __abs__(self):
+        return AbsNode([self])
+    def sqrt(self):
+        return SqrtNode([self])
 
     def __repr__(self):
         return f"{self.__class__.__name__.removesuffix('Node')}({', '.join(map(str, self.parents))})"
@@ -161,7 +189,7 @@ class OpNode:
         else:
             parents=self.parents
         return tuple(parents),typearg
-    def constelimination(self):
+    def consteliminationnode(self):
         return self
     
     
@@ -193,6 +221,8 @@ class OpNode:
         nodesigcash[sig]=simplified
 
         return simplified
+    def backpropergationnode(self,doutdnode):
+        raise NotImplementedError(f"backpropergation not implemented in nodetype {type(self)}")
 
 
 
@@ -237,6 +267,14 @@ class EndpointNode(OpNode):
                     return newnode
             return node
         self.replacenode(nodemerger)
+    def backpropergation(self,variables=None):
+        if len(self.parents)!=1:
+            raise NotImplementedError("currently backpropergation is only supported for one output")
+        return self.parents[0].backpropergation(variables)
+    
+
+
+
 
 
 
@@ -257,6 +295,8 @@ class ConstNode(OpNode):
         return ConstNode(self.value)
     def signature(self):
         return super().signature(args=self.value)
+    def backpropergationnode(self,doutdnode):
+        pass
 
 
 class VarNode(OpNode):
@@ -276,6 +316,8 @@ class VarNode(OpNode):
         return VarNode(self.varname)
     def signature(self):
         return super().signature(args=self.varname)
+    def backpropergationnode(self,doutdnode):
+        pass
 
 
 # Operation-Specific Nodes
@@ -286,12 +328,9 @@ class AddNode(OpNode):
     def nodedef(self,parentnames,small=False):
         if small:return "("+"+".join(parentnames)+")"
         return super().nodedef(parentnames)
-
-    def __repr__(self):
-        return f"Add({self.parents[0]}, {self.parents[1]})"
     def signature(self):
         return super().signature(associative=True)
-    def constelimination(self):
+    def consteliminationnode(self):
         s=0
         parentsnew=[]
         containsconst=False
@@ -310,6 +349,10 @@ class AddNode(OpNode):
         if not containsconst:
             return self
         return AddNode(parentsnew)
+    def backpropergationnode(self,doutdnode):
+        doutdself=doutdnode[self]
+        for p in self.parents:
+            doutdnode[p]+=doutdself#*one
 
 class MulNode(OpNode):
     """
@@ -318,12 +361,9 @@ class MulNode(OpNode):
     def nodedef(self,parentnames,small=False):
         if small:return "("+"*".join(parentnames)+")"
         return super().nodedef(parentnames)
-
-    # def __repr__(self):
-    #     return f"Mul({self.parents[0]}, {self.parents[1]})"
     def signature(self):
         return super().signature(associative=True)
-    def constelimination(self):
+    def consteliminationnode(self):
         s=1
         parentsnew=[]
         containsconst=False
@@ -342,6 +382,22 @@ class MulNode(OpNode):
         if not containsconst:
             return self
         return MulNode(parentsnew)
+    def backpropergationnode(self,doutdnode):
+
+        #e=a*b*c*d
+        #doutdnode[a]+=1 * b*c*d*1=left[0]*right[-1]
+        #doutdnode[b]+=1*a * c*d*1=left[1]*right[-2]
+        #doutdnode[c]+=1*a*b * d*1=left[2]*right[-3]
+        #doutdnode[d]+=1*a*b*c * 1=left[3]*right[-4]
+    
+        left=[ConstNode(1)]
+        right=[ConstNode(1)]
+        for i in range(len(self.parents)-1):
+            left.append(left[-1]*self.parents[i])
+            right.append(right[-1]*self.parents[-1-i])
+        doutdself=doutdnode[self]
+        for i in range(len(self.parents)):
+            doutdnode[self.parents[i]]+=left[i]*right[-i-1]*doutdself
 
 class SubNode(OpNode):
     """
@@ -350,9 +406,7 @@ class SubNode(OpNode):
     def nodedef(self,parentnames,small=False):
         if small:return "("+"-".join(parentnames)+")"
         return super().nodedef(parentnames)
-    def __repr__(self):
-        return f"Sub({self.parents[0]}, {self.parents[1]})"
-    def constelimination(self):
+    def consteliminationnode(self):
         if isinstance(self.parents[1],ConstNode):
             if self.parents[1].value==0:
                 return self.parents[0]
@@ -365,6 +419,46 @@ class SubNode(OpNode):
     def normalizenode(self):
         return AddNode([self.parents[0],MulNode([self.parents[1],-1])])
     
+class AbsNode(OpNode):
+    def nodedef(self,parentnames,small=False):
+        if small:return "abs("+"?".join(parentnames)+")"
+        return super().nodedef(parentnames)
+    def consteliminationnode(self):
+        if isinstance(self.parents[0],ConstNode):
+            return ConstNode(abs(self.parents[0].value))
+        return self
+    def backpropergationnode(self, doutdnode):
+        parent=self.parents[0]
+        doutdnode[parent] += doutdnode[self]*SignNode([parent])  
+class SignNode(OpNode):
+    def nodedef(self,parentnames,small=False):
+        if small:return "sign("+"?".join(parentnames)+")"
+        return super().nodedef(parentnames)
+    def consteliminationnode(self):
+        if isinstance(self.parents[0],ConstNode):
+            v=self.parents[0].value
+
+            return ConstNode(1 if v > 0 else -1 if v < 0 else 0)
+        return self
+    def backpropergationnode(self, doutdnode):
+        # Signum has no meaningful gradient for backpropagation
+        # Typically, we stop the gradient here or pass zero
+        #doutdnode[self] += ConstNode(0)  # Gradient is zero everywhere except at undefined points
+        pass
+class SqrtNode(OpNode):
+    def nodedef(self,parentnames,small=False):
+        if small:return "sqrt("+"?".join(parentnames)+")"
+        return super().nodedef(parentnames)
+    def consteliminationnode(self):
+        if isinstance(self.parents[0],ConstNode):
+            return ConstNode((self.parents[0].value)**.5)
+        return self
+    def backpropergationnode(self, doutdnode):
+        #sqrt(x)->1/(2*sqrt(x))
+        # self.parents[0] ist die Eingabe x der Inversion
+        parent = self.parents[0]
+        grad = InvNode([2*SqrtNode(parent)])
+        doutdnode[parent] += doutdnode[self]*grad
 class NegNode(OpNode):
     """
     Represents a subtraction operation in the computation graph.
@@ -372,15 +466,12 @@ class NegNode(OpNode):
     def nodedef(self,parentnames,small=False):
         if small:return "-("+"?".join(parentnames)+")"
         return super().nodedef(parentnames)
-    def __repr__(self):
-        return f"Neg({self.parents[0]})"
-    def constelimination(self):
+    def consteliminationnode(self):
         if isinstance(self.parents[0],ConstNode):
             return ConstNode(-self.parents[0].value)
         return self
     def normalizenode(self):
         return MulNode([self.parents[0],-1])
-
 class InvNode(OpNode):
     """
     Represents a division operation in the computation graph.
@@ -388,12 +479,15 @@ class InvNode(OpNode):
     def nodedef(self,parentnames,small=False):
         if small:return "1/("+"?".join(parentnames)+")"
         return super().nodedef(parentnames)
-    def __repr__(self):
-        return f"Inv({self.parents[0]})"
-    def constelimination(self):
+    def consteliminationnode(self):
         if isinstance(self.parents[0],ConstNode):
             return ConstNode(1/self.parents[0].value)
         return self
+    def backpropergationnode(self, doutdnode):
+        # self.parents[0] ist die Eingabe x der Inversion
+        parent = self.parents[0]
+        grad = ConstNode(-1)  * InvNode([parent * parent])
+        doutdnode[parent] += doutdnode[self]*grad
 class DivNode(OpNode):
     """
     Represents a division operation in the computation graph.
@@ -401,9 +495,7 @@ class DivNode(OpNode):
     def nodedef(self,parentnames,small=False):
         if small:return "("+"/".join(parentnames)+")"
         return super().nodedef(parentnames)
-    def __repr__(self):
-        return f"Div({self.parents[0]}, {self.parents[1]})"
-    def constelimination(self):
+    def consteliminationnode(self):
         if isinstance(self.parents[1],ConstNode):
             if self.parents[1].value==1:
                 return self.parents[0]
@@ -424,6 +516,7 @@ if __name__=="__main__":
     import cProfile
     import pstats
     from io import StringIO
+    print("go")
 
     # Usage Example
     # x = VarNode("x")
@@ -450,11 +543,21 @@ if __name__=="__main__":
 
     import algebra.dcga as dcga
 
-
-    point=dcga.point(VarNode("x"),VarNode("y"),VarNode("z"))
+    xyz=VarNode("x"),VarNode("y"),VarNode("z")
+    point=dcga.point(*xyz)
     torus=dcga.toroid(2,0.5)
-    iprod=point^torus
-    e=EndpointNode(iprod.blades.values())
+    iprod=point.inner(torus)
+    
+    e=sum(abs(x) for x in iprod.blades.values())
+    ep=EndpointNode([e])
+    
+    ep.replacenode(lambda x:x.normalizenode())
+    ep.replacenode(lambda x:x.consteliminationnode())#simplify
+    ep.mergenodes()
+    print(ep.asplanstrcompact())
+    bp=ep.backpropergation()
+    e=EndpointNode([bp[v] for v in xyz]+[e])
+
     #e.subexpressionelimination()
     # import sys
     # sys.setrecursionlimit(10000)
@@ -464,9 +567,9 @@ if __name__=="__main__":
     #e.simplify()
     e.replacenode(lambda x:x)#subexpressionelimination
     e.replacenode(lambda x:x.normalizenode())#normlization
-    e.replacenode(lambda x:x.constelimination())#simplify
+    e.replacenode(lambda x:x.consteliminationnode())#simplify
     e.mergenodes()
-    e.replacenode(lambda x:x.constelimination())
+    e.replacenode(lambda x:x.consteliminationnode())
 
     def replacer(x):
         d={"x":2,"y":3,"z":4}

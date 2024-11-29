@@ -2,7 +2,11 @@ import glfw
 from OpenGL.GL import *
 from OpenGL.GL.shaders import compileShader, compileProgram
 import numpy as np
-
+import time
+import sys
+sys.path.append('./')
+from variable_listener import Server
+server=Server()
 
 camera_pos = np.array([0.0, 0.0, -5.0], dtype=np.float32)  # Camera position
 camera_matrix=np.eye(3)#cam to world
@@ -72,11 +76,11 @@ def readfile(path):
 # Compile shaders
 vertex_src = readfile("./spheretracing/vertexshader.glsl")
 
-fragment_src = readfile("./spheretracing/fragmentshader.glsl")
+fragment_src = readfile("./spheretracing/fragmentshader3.glsl")
 
 scene=readfile("./scene.glsl")
 fragment_src=fragment_src.split("//cutoff")[0]+scene
-print(fragment_src)
+#print(fragment_src)
 
 shader = compileProgram(
     compileShader(vertex_src, GL_VERTEX_SHADER),
@@ -107,18 +111,25 @@ glBindVertexArray(0)
 def handle_keys(window):
     global camera_pos, camera_speed,yaw
     camera_front=camera_matrix@np.array([0,0,1])
+
+    camera_speedlocal=camera_speed
+    rotspeed=0.5
+    if glfw.get_key(window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS:
+        camera_speedlocal*=4
+        rotspeed*=4
+
     if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:  # Move forward
-        camera_pos += camera_speed * camera_front
+        camera_pos += camera_speedlocal * camera_front
     if glfw.get_key(window, glfw.KEY_S) == glfw.PRESS:  # Move backward
-        camera_pos -= camera_speed * camera_front
+        camera_pos -= camera_speedlocal * camera_front
     if glfw.get_key(window, glfw.KEY_A) == glfw.PRESS:  # Move left
-        camera_pos += camera_matrix@np.array([-1,0,0]) * camera_speed
+        camera_pos += camera_matrix@np.array([-1,0,0]) * camera_speedlocal
     if glfw.get_key(window, glfw.KEY_D) == glfw.PRESS:  # Move right
-        camera_pos += camera_matrix@np.array([1,0,0]) * camera_speed
+        camera_pos += camera_matrix@np.array([1,0,0]) * camera_speedlocal
     if glfw.get_key(window, glfw.KEY_E) == glfw.PRESS:  # Move right
-        yaw += 0.5
+        yaw += rotspeed
     if glfw.get_key(window, glfw.KEY_Q) == glfw.PRESS:  # Move right
-        yaw -= 0.5
+        yaw -= rotspeed
     updatecammat()
 last_x, last_y = 400, 300  # Center of the screen
 
@@ -160,13 +171,33 @@ glUniform3f(glGetUniformLocation(shader, "lookat"), 0.0, 0.0, 0.0)
 glUniform3f(glGetUniformLocation(shader, "lightPos"), 5.0, 5.0, -5.0)
 
 # Render loop
+
+raydyinit=1000
+rayfactor=2
+rayalpha=0.5
+rayepsilon=0.00001
+raypow=1
+
+varupdates=server.variableupdates
+
 while not glfw.window_should_close(window):
+    cammatold,camposold=camera_matrix.copy(),camera_pos.copy()
     glfw.poll_events()
     handle_keys(window)  # Process keyboard input
+    if np.array_equal(cammatold,camera_matrix) and np.array_equal(camposold,camera_pos) and varupdates==server.variableupdates:
+        time.sleep(0.1)
+        continue
+    varupdates=server.variableupdates
 
     glClear(GL_COLOR_BUFFER_BIT)
-
     glUseProgram(shader)
+
+    glUniform1f(glGetUniformLocation(shader, "raydyinit"),raydyinit )
+    glUniform1f(glGetUniformLocation(shader, "rayfactor"),rayfactor )
+    glUniform1f(glGetUniformLocation(shader, "rayalpha"),rayalpha )
+    glUniform1f(glGetUniformLocation(shader, "rayepsilon"),rayepsilon )
+    glUniform1f(glGetUniformLocation(shader, "raypow"),raypow )
+
 
    
     #camera_matrix = getCam(camera_pos, camera_pos + camera_front)
@@ -175,9 +206,9 @@ while not glfw.window_should_close(window):
     glUniform1f(glGetUniformLocation(shader, "time"), glfw.get_time())
     glUniformMatrix3fv(glGetUniformLocation(shader, "cameraMatrix"), 1, GL_TRUE, camera_matrix)
 
+
     glBindVertexArray(vao)
     glDrawElements(GL_TRIANGLES, len(indices), GL_UNSIGNED_INT, None)
-
     glfw.swap_buffers(window)
 
 glfw.terminate()

@@ -9,7 +9,15 @@ uniform vec2 windowsize;
 uniform mat3 cameraMatrix;
 
 
-const float FOV=1;
+uniform float raydyinit;
+uniform float rayfactor;
+uniform float rayalpha;
+uniform float rayepsilon;
+uniform float raypow;
+
+
+const float FOV=120;
+const float FOVfactor=1/tan(radians(FOV) * 0.5);
 const float EPSILON_RAYMARCHING=0.001;
 const float EPSILON_NORMALS=0.001;
 const int MAX_RAY_ITER=128;
@@ -24,7 +32,7 @@ float sum(vec3 v) {
     return v.x+v.y+v.z;
 }
 
-float scene(vec3 p);
+vec4 scene(vec3 p);
 
 
 vec3 normaltocol(vec3 normal){
@@ -43,12 +51,7 @@ vec3 getNormal(vec3 p) {
     ));
 }*/
 vec3 getNormal(vec3 p) {
-    vec2 e = vec2(1.0, -1.0) * EPSILON_NORMALS;
-    return normalize(
-      e.xyy * scene(p + e.xyy) +
-      e.yyx * scene(p + e.yyx) +
-      e.yxy * scene(p + e.yxy) +
-      e.xxx * scene(p + e.xxx));
+    return normalize(scene(p).xyz);
 }
 vec3 getNormal2(vec3 p,vec3 rayDir){
     int iterations=2;
@@ -60,21 +63,73 @@ vec3 getNormal2(vec3 p,vec3 rayDir){
 }
 
 
+
+
 float raymarch(vec3 rayDir,inout vec3 rayOrigin){
     //vec3 p=rayOrigin;
-    float dy=1;
+    float dy=raydyinit;
     float magnitude;
     //float dx;
     for (int i = 0; i < MAX_RAY_ITER; i++) {
-        magnitude = scene(rayOrigin);
-        dy=dy*0.5+2*abs((magnitude-scene(rayOrigin+rayDir*EPSILON_NORMALS))/EPSILON_NORMALS);
+        vec4 s=scene(rayOrigin);
+        magnitude =s.w ;
+        //dy=0.5*dy+2*abs(dot(s.xyz,rayDir));
+        dy=rayalpha*dy+rayfactor*length(s.xyz);
+        
 
-        if (magnitude < EPSILON_RAYMARCHING || any(isinf(rayOrigin))||isinf(magnitude))
+        if (magnitude < EPSILON_RAYMARCHING || any(isinf(rayOrigin))||isinf(magnitude)||abs(rayOrigin.x)>10E10||abs(rayOrigin.y)>10E10||abs(rayOrigin.z)>10E10)
             return magnitude; // Close enough
-        rayOrigin += rayDir * (magnitude/(dy+1));
+        rayOrigin += rayDir * (magnitude/(pow(dy,raypow)+rayepsilon));
     }   
     return magnitude;
 }
+
+/*float raymarch(vec3 rayDir,inout vec3 rayOrigin){
+    float fdx=0.01;
+    float hlast=1;
+    float dhlast=0;
+    float dx=0;
+    float x=0;
+    float h;
+    float dh;
+    float dy;
+    for (int i = 0; i < MAX_RAY_ITER; i++) {
+        vec4 s=scene(rayOrigin+x*rayDir);
+        h =s.w ;
+        dh=dot(rayDir,s.xyz);
+        float error=abs((dhlast*dx+hlast)/h);
+    
+        if(1.1>error && error>0.9 && fdx<1){
+            fdx*=1.1;
+        }else if(fdx>0.01){
+            fdx/=2;
+        }
+        
+        //dy=0*abs(dot(s.xyz,rayDir))+length(s.xyz);
+        dy=rayalpha*dy+rayfactor*length(s.xyz);
+        
+
+        if (h < EPSILON_RAYMARCHING){
+
+            rayOrigin=rayOrigin+x*rayDir;
+            return h;
+        }
+             // Close enough
+        dx=(h/(dy+rayepsilon))*fdx;
+        x+=dx;
+        hlast=h;
+        dhlast=dh;
+    }   
+    rayOrigin=rayOrigin+x*rayDir;
+    return h;
+}*/
+
+
+
+
+
+
+
 
 bool any(bvec3 b) {
     return b.x || b.y || b.z;
@@ -152,7 +207,7 @@ void main() {
     //color = vec4(vec2(uv), 0.0, 1.0); // Background
     //return;
     vec3 rayOrigin = cameraPos;
-    vec3 rayDir =cameraMatrix* normalize(vec3(uv, FOV));
+    vec3 rayDir =cameraMatrix* normalize(vec3(uv, FOVfactor));
 
 
     // Sphere tracing
@@ -182,7 +237,7 @@ void main() {
     if(any(isnan(col))){
         col=vec3(1,1,0);
     }
-    if(any(isinf(vec3(p)))){
+    if(any(isinf(vec3(p))) || abs(p.x)>10E10||abs(p.y)>10E10||abs(p.z)>10E10){
         col=vec3(0,0,0.5);
     }
 
@@ -191,8 +246,3 @@ void main() {
 
 
 //cutoff
-float scene(vec3 p){
-    return min(sphere(p, 1.0),sphere(p-vec3(0.6,0.7,0.8), 1.0));
-    //return sphere(p, 1.0); // Animate the sphere
-    //return sphere(p - vec3(sin(time), cos(time), 0.0), 1.0); // Animate the sphere
-}

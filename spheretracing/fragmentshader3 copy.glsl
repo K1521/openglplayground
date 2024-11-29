@@ -9,7 +9,8 @@ uniform vec2 windowsize;
 uniform mat3 cameraMatrix;
 
 
-const float FOV=1;
+const float FOV=120;
+const float FOVfactor=1/tan(radians(FOV) * 0.5);
 const float EPSILON_RAYMARCHING=0.001;
 const float EPSILON_NORMALS=0.001;
 const int MAX_RAY_ITER=128;
@@ -24,7 +25,7 @@ float sum(vec3 v) {
     return v.x+v.y+v.z;
 }
 
-float scene(vec3 p);
+vec4 scene(vec3 p);
 
 
 vec3 normaltocol(vec3 normal){
@@ -43,12 +44,7 @@ vec3 getNormal(vec3 p) {
     ));
 }*/
 vec3 getNormal(vec3 p) {
-    vec2 e = vec2(1.0, -1.0) * EPSILON_NORMALS;
-    return normalize(
-      e.xyy * scene(p + e.xyy) +
-      e.yyx * scene(p + e.yyx) +
-      e.yxy * scene(p + e.yxy) +
-      e.xxx * scene(p + e.xxx));
+    return normalize(scene(p).xyz);
 }
 vec3 getNormal2(vec3 p,vec3 rayDir){
     int iterations=2;
@@ -62,16 +58,19 @@ vec3 getNormal2(vec3 p,vec3 rayDir){
 
 float raymarch(vec3 rayDir,inout vec3 rayOrigin){
     //vec3 p=rayOrigin;
-    float dy=1;
+    float dy=1000;
     float magnitude;
     //float dx;
     for (int i = 0; i < MAX_RAY_ITER; i++) {
-        magnitude = scene(rayOrigin);
-        dy=dy*0.5+2*abs((magnitude-scene(rayOrigin+rayDir*EPSILON_NORMALS))/EPSILON_NORMALS);
+        vec4 s=scene(rayOrigin);
+        magnitude =s.w ;
+        //dy=0.5*dy+2*abs(dot(s.xyz,rayDir));
+        dy=0.5*dy+2*length(s.xyz);
+        
 
         if (magnitude < EPSILON_RAYMARCHING || any(isinf(rayOrigin))||isinf(magnitude))
             return magnitude; // Close enough
-        rayOrigin += rayDir * (magnitude/(dy+1));
+        rayOrigin += rayDir * (magnitude/(dy+0.001));
     }   
     return magnitude;
 }
@@ -152,7 +151,7 @@ void main() {
     //color = vec4(vec2(uv), 0.0, 1.0); // Background
     //return;
     vec3 rayOrigin = cameraPos;
-    vec3 rayDir =cameraMatrix* normalize(vec3(uv, FOV));
+    vec3 rayDir =cameraMatrix* normalize(vec3(uv, FOVfactor));
 
 
     // Sphere tracing
@@ -191,8 +190,3 @@ void main() {
 
 
 //cutoff
-float scene(vec3 p){
-    return min(sphere(p, 1.0),sphere(p-vec3(0.6,0.7,0.8), 1.0));
-    //return sphere(p, 1.0); // Animate the sphere
-    //return sphere(p - vec3(sin(time), cos(time), 0.0), 1.0); // Animate the sphere
-}

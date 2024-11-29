@@ -1,0 +1,20 @@
+
+opgraph:
+abs,pow,sqrt
+ausmultiplizieren
+ableitungen! interface verbessern
+evaluate!
+numpy array support
+
+translate to opengl:
+intervallarethmetic
+marching cubes anhand von ableitungen
+vectorfeld visualisieren
+
+
+tracing2:
+anpassen mit ableitungen
+analyse mit graphen
+rotate around point controlls+zoom  
+axen
+arbitrary variable modification

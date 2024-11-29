@@ -22,10 +22,12 @@ float product_len (in float z, in float y, in float x, in float[${counts[grade]}
 vec3 find_root (in vec3 start, vec3 dir, in float thresh) {
     vec3 orig=start; 
     float lastd = 1000.0; 
-    const int count=${(options.maxSteps||80)};
+    const int count=80;
+    const thresh=0.2;
+    const float stepSize=0.0001
     for (int i=0; i<count; i++) {
         float d = product_len(start[0],start[1],start[2],b);
-        float diff = ${(options.stepSize||0.0001)}*(1.0+2000.0*d);
+        float diff = stepSize*(1.0+2000.0*d);
         if (d < thresh)
             return start + dir*(lastd-thresh)/(lastd-d)*diff;
         lastd = d;

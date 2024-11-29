@@ -11,8 +11,8 @@ uniform mat3 cameraMatrix;
 
 const float FOV=1;
 const float EPSILON_RAYMARCHING=0.001;
-const float EPSILON_NORMALS=0.001;
-const int MAX_RAY_ITER=128;
+const float EPSILON_NORMALS=0.00001;
+const int MAX_RAY_ITER=20;
 
 float sphere(vec3 p, float r) {
     float x=(length(p) - r);
@@ -62,27 +62,6 @@ vec3 getNormal2(vec3 p,vec3 rayDir){
 
 float raymarch(vec3 rayDir,inout vec3 rayOrigin){
     //vec3 p=rayOrigin;
-    float dy=1;
-    float magnitude;
-    //float dx;
-    for (int i = 0; i < MAX_RAY_ITER; i++) {
-        magnitude = scene(rayOrigin);
-        dy=dy*0.5+2*abs((magnitude-scene(rayOrigin+rayDir*EPSILON_NORMALS))/EPSILON_NORMALS);
-
-        if (magnitude < EPSILON_RAYMARCHING || any(isinf(rayOrigin))||isinf(magnitude))
-            return magnitude; // Close enough
-        rayOrigin += rayDir * (magnitude/(dy+1));
-    }   
-    return magnitude;
-}
-
-bool any(bvec3 b) {
-    return b.x || b.y || b.z;
-}
-
-/*
-float raymarch(vec3 rayDir,inout vec3 rayOrigin){
-    //vec3 p=rayOrigin;
     float distance;
     for (int i = 0; i < MAX_RAY_ITER; i++) {
         distance = scene(rayOrigin);
@@ -92,26 +71,6 @@ float raymarch(vec3 rayDir,inout vec3 rayOrigin){
     }   
     return distance;
 }
-*/
-/*float raymarch (vec3 dir,inout vec3 start) {
-    vec3 orig=start; 
-    float lastd = 1000.0; 
-    const int count=80;
-    const float thresh=0.2;
-    const float stepSize=0.00001;
-    float diff;
-    for (int i=0; i<count; i++) {
-        float d = scene(start);
-        diff = stepSize*(1.0+1000.0*d);
-        if (d < thresh){
-            start += dir*(lastd-thresh)/(lastd-d)*diff;
-            return diff;
-        }
-        lastd = d;
-        start += dir*diff;
-    }
-    return diff;
-}*/
 
 vec3 getlight(vec3 p,vec3 rayDir,vec3 color){
 
@@ -158,35 +117,24 @@ void main() {
     // Sphere tracing
 
     vec3 p=rayOrigin;
-    float dist=raymarch(rayDir,p);
+    float distance=raymarch(rayDir,p);
 
-    //if ( true||(dist < EPSILON_RAYMARCHING)) {
+    if (true || (distance < EPSILON_RAYMARCHING)) {
         
-    //vec3 normal = getNormal2(p,rayDir);//usefull for reducing artefacts in unsigned distance functions
+        //vec3 normal = getNormal2(p,rayDir);//usefull for reducing artefacts in unsigned distance functions
     // Checkerboard pattern
-    float checker = 0.3 + 0.7 * mod(sum(floor(p * 4.0)), 2.0); // Alternates between 0.5 and 1.0
-    //vec3 col=vec3(checker);
-    vec3 col =getlight(p,rayDir,vec3(1)*checker);
+        float checker = 0.3 + 0.7 * mod(sum(floor(p * 4.0)), 2.0); // Alternates between 0.5 and 1.0
+        //vec3 col=vec3(checker);
+        vec3 col =getlight(p,rayDir,vec3(1)*checker);
 
-    //col=normaltocol(getNormal2(p,rayDir));
-    col=pow(col,vec3(0.4545));//gamma correction
+        //col=normaltocol(getNormal2(p,rayDir));
+        col=pow(col,vec3(0.4545));//gamma correction
 
-    if ((dist < EPSILON_RAYMARCHING)) {
-
+        color= vec4(col,1);
+        //color=vec4(normaltocol(normal),1);
     } else {
-        col*=vec3(1,0,0);
-        
-        //color = vec4(0.0, 0.0, 0.0, 1.0); // Background
+        color = vec4(0.0, 0.0, 0.0, 1.0); // Background
     }
-    
-    if(any(isnan(col))){
-        col=vec3(1,1,0);
-    }
-    if(any(isinf(vec3(p)))){
-        col=vec3(0,0,0.5);
-    }
-
-    color= vec4(col,1);
 }
 
 
