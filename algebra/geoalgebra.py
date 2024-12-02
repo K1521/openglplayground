@@ -172,11 +172,23 @@ class tablealgebra(algebraspecification):
 # print(((basis1^basis2)&~(basis1&basis2)).astype(int))
 
 # print(~1)
+
+def iszerro(x):
+    if isinstance(x,(int,float)):
+        return x==0
+    if isinstance(x,np.ndarray):
+        return np.allclose(x,0,rtol=1E-13)
+    return x==0
+def dictreomove0s(d):
+    return {k:v for k,v in d.items() if not iszerro(v)} 
+
+
 from collections import defaultdict
 class bladedict:
     def __init__(self,algebra,blades):
-        self.blades=blades
+        self.blades=dictreomove0s(blades)
         self.algebra=algebra
+
 
     def convert(self,other):
         if isinstance(other,bladedict):
@@ -234,11 +246,13 @@ class bladedict:
         if len(self.blades)==1 and 0 in self.blades:
             return self.blades[0]
         if raiseifinconvertible:
-            raise Exception("not convertible")
+            raise Exception("cant convert to scalar")
     def __truediv__(self,other):
         other=self.convert(other).toscalar(False)
         if other is None:
             raise Exception("currently only integer/float division is supported")
+        if iszerro(other):
+            raise ZeroDivisionError("cant divide by 0")
         newdict={k:v/other for k,v in self.blades.items()}
         return bladedict(self.algebra,newdict)
     def _1dtableproduct(self,table):
@@ -247,14 +261,14 @@ class bladedict:
             if v==1:return value
             if v==-1:return -value
             return v*value
-        newdict={b:transform(b,v)for b,v in self.blades}
+        newdict={b:transform(b,v)for b,v in self.blades.items()}
         return bladedict(self.algebra,newdict)
     def involute(self):
-        return self._1dtableproduct(self,self.algebra.involute)
+        return self._1dtableproduct(self.algebra.involute)
     def conjugate(self):
-        return self._1dtableproduct(self,self.algebra.conjugate)
+        return self._1dtableproduct(self.algebra.conjugate)
     def reverse(self):
-        return self._1dtableproduct(self,self.algebra.reverse)
+        return self._1dtableproduct(self.algebra.reverse)
     def __neg__(self):
         newdict={b:-v for b,v in self.blades.items()}
         return bladedict(self.algebra,newdict)

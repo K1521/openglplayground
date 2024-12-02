@@ -6,7 +6,7 @@ import algebra.dcga as dcga
 
 
 
-t=dcga.Translator(0,1,0)
+t=dcga.Translator(3,4,5)
 print((t*t.reverse()).blades)
 def sanwich(V,m):
     return V*m*dcga.inverse(V)
@@ -16,7 +16,7 @@ point=dcga.point(*xyz)
 obj=dcga.toroid(2,0.5)
 #obj=dcga.Plane(1,1,1,1)
 
-#obj=sanwich(t,obj)
+obj=sanwich(t,obj)
 iprod=point.inner(obj)
 e=sum(abs(x) for x in iprod.blades.values())
 ep=opg.EndpointNode([e])
@@ -42,19 +42,6 @@ plan=e.asplanstr(compact=True).replace("node","n").split("\n")
 
 last=list((plan.pop().split("Endpoint")[1].strip("()").replace(" ","").split(",")))
 
-plangsgl="\n".join([f"float {l};" for l in plan])
-
-#last="\nreturn ("+"+".join([f"{l}" for l in last])+");"
-#last="\nreturn sqrt("+"+".join([f"abs({l})" for l in last])+");"
-lastgsgl="\nreturn vec4("+",".join(l for l in last)+");"
-
-fundec=f"vec4 scene(vec3 p){{\nfloat x=p.x;float y=p.y;float z=p.z;\n{plangsgl+lastgsgl}\n}}"
-with open("./scene.glsl","w")as f:
-    f.write(fundec)
-print(fundec)
-print()
-
-
 
 fundefspy="""
 import numpy as np
@@ -68,7 +55,7 @@ planpy="\n".join([f"    {l}" for l in plan])
 lastpy="\n    return ("+",".join(f"{l}" for l in last)+")"
 
 fundec=fundefspy+f"def scene(p):\n    x,y,z=p\n{planpy+lastpy}\n"
-with open("./scene.py","w")as f:
+with open("./scene2.py","w")as f:
     f.write(fundec)
 print(fundec)
 print()

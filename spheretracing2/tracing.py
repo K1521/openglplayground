@@ -74,11 +74,11 @@ def readfile(path):
 
 
 # Compile shaders
-vertex_src = readfile("./spheretracing/vertexshader.glsl")
+vertex_src = readfile("./spheretracing2/vertexshader.glsl")
 
-fragment_src = readfile("./spheretracing/fragmentshader3.glsl")
+fragment_src = readfile("./spheretracing2/fragmentshader.glsl")
 
-scene=readfile("./scene.glsl")
+scene=readfile("./spheretracing2/scene.glsl")
 fragment_src=fragment_src.split("//cutoff")[0]+scene
 #print(fragment_src)
 

@@ -18,7 +18,7 @@ client=Client()
 raydyinit=client["raydyinit"]=1
 rayfactor=client["rayfactor"]=1
 rayalpha=client["rayalpha"]=0
-rayepsilon=client["rayepsilon"]=0.01
+rayepsilon=client["rayepsilon"]=0.1
 raypow=client["raypow"]=1
 
 camera_matrix=client["camera_matrix"]
@@ -37,9 +37,10 @@ x,y,z,e=scene(ray.T)
 xyz=np.vstack([x,y,z]).T
 #print(y)
 plt.plot(lin,e,label="e")
-plt.plot(lin,e**.5,label="sqrte")
+plt.plot(lin,e**(1/4),label="sqrte")
 plt.plot(lin,np.linalg.norm(xyz,axis=-1),label="norm")
-plt.plot(lin,e/np.linalg.norm(xyz,axis=-1),label="stepnorm")
+plt.plot(lin,abs(np.sum(xyz*fn,axis=-1)),label="derive")
+plt.plot(lin,e/(np.linalg.norm(xyz,axis=-1)*4+4),label="stepnorm")
 plt.plot(lin,e/np.sum(xyz*fn,axis=-1),label="stepnewton")
 #plt.plot(lin,2*e/(np.sum(xyz*fn,axis=-1)+np.linalg.norm(xyz,axis=-1)),label="stepnewton")
 

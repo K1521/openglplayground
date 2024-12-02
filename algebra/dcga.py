@@ -66,35 +66,35 @@ def CGA2_Translator(x,y,z):
 def Translator(x,y,z):
     return CGA1_Translator(x,y,z)^CGA2_Translator(x,y,z)
 
-def IE1():
-    return e1 ^ e2 ^ e3
+IE1=e1 ^ e2 ^ e3
 
-def IE2():
-    return e6 ^ e7 ^ e8
+IE2=e6 ^ e7 ^ e8
 
-def IC1():
-    return e1 ^ e2 ^ e3 ^ e4 ^ e5
+IC1=e1 ^ e2 ^ e3 ^ e4 ^ e5
 
-def IC2():
-    return e6 ^ e7 ^ e8 ^ e9 ^ e10
+IC2=e6 ^ e7 ^ e8 ^ e9 ^ e10
 
-def ID():
-    return e1 ^ e2 ^ e3 ^ e4 ^ e5 ^ e6 ^ e7 ^ e8 ^ e9 ^ e10
+ID=e1 ^ e2 ^ e3 ^ e4 ^ e5 ^ e6 ^ e7 ^ e8 ^ e9 ^ e10
 
 def DD(P1):
-    return -(P1.inner(ID()))
+    return -(P1.inner(ID))
 
 def C1D(P1):
-    return -(P1.inner(IC1()))
+    return -(P1.inner(IC1))
 
 def C2D(P1):
-    return -(P1.inner(IC2()))
+    return -(P1.inner(IC2))
 
 def E1D(P1):
-    return -(P1.inner(IE1()))
+    return -(P1.inner(IE1))
 
 def E2D(P1):
-    return -(P1.inner(IE2()))
+    return -(P1.inner(IE2))
 
 def Dual(P1):
     return DD(P1)
+
+def inverse(V):
+    Vr = V.reverse()
+    #print(V.inner(Vr).blades)
+    return Vr/(V*Vr)
