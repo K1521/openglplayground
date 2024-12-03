@@ -505,7 +505,12 @@ class DivNode(OpNode):
         return self
     def normalizenode(self):
         return MulNode([self.parents[0],InvNode([self.parents[1]])])
-
+    def backpropergationnode(self,doutdnode):
+        doutdself=doutdnode[self]
+        a=self.parents[0]
+        b=self.parents[1]
+        doutdnode[a]+=doutdself/b
+        doutdnode[b]+=-doutdself*a/(b*b)
 
 
 if __name__=="__main__":

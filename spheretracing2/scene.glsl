@@ -4,8 +4,6 @@ const int numparams=5;
 float[numpolys][numparams] polys;
 //float A;
 
-
-
 float calcpolys(float x){
     //x-=A;
     float[numparams] pows;
@@ -24,6 +22,19 @@ float calcpolys(float x){
         s+=abs(d);
     }
     return s;
+}
+const float inf=1/0;
+
+float rootpolysquartic(){
+    float minx=inf;
+    vec4 roots=solveQuartic(polys[0][4]/24,polys[0][3]/6,polys[0][2]/2,polys[0][1],polys[0][0]);
+    for(int i=0;i<5){
+    float root=roots[i];
+        if(!isnan(root) && root>0){
+            minx=min(minx,root);
+        }
+    }
+    return minx;
 }
 
 //void compilepolys(vec3 p,vec3 d,float a){
