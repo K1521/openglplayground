@@ -30,10 +30,10 @@ def funtovisualize(x,y,z):
     #e=sum(abs(x) for x in iprod.blades.values())
 
 
-def funtovisualize(x,y,z):
+# def funtovisualize(x,y,z):
 
 
-    return [(x*x+y*y-1)*(x*x+z*z-1)]
+#     return [(x*x+y*y-1)*(x*x+z*z-1)]
 
 def simplify(endpoint):
     endpoint.replacenode(lambda x:x)#subexpressionelimination

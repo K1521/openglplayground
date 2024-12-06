@@ -200,6 +200,8 @@ vec3 solveCubic(float a, float b, float c, float d) {
 // Returns vec4 with real roots, unused roots set to INFINITY
 vec4 solveQuartic(float a, float b, float c, float d, float e) {
     if(abs(a)<1E-6)return vec4(solveCubic(b,c,d,e),nan);
+
+    float xoffset=0;
     // Compute intermediate values
     float p = (8.0 * a * c - 3.0 * b * b) / (8.0 * a * a);
     float q = (b * b * b - 4.0 * a * b * c + 8.0 * a * a * d) / (8.0 * a * a * a);
@@ -232,7 +234,7 @@ vec4 solveQuartic(float a, float b, float c, float d, float e) {
     roots.z = offset + S + 0.5 * sqrt(-4.0 * S * S - 2.0 * p - (q / S));
     roots.w = offset + S - 0.5 * sqrt(-4.0 * S * S - 2.0 * p - (q / S));
 
-    return roots;
+    return roots+xoffset;
 }
 
 
