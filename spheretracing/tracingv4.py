@@ -74,15 +74,13 @@ def readfile(path):
 
 
 # Compile shaders
-vertex_src = readfile("./spheretracing2/vertexshader.glsl")
+vertex_src = readfile("./spheretracing/vertexshader.glsl")
 
-fragment_src = readfile("./spheretracing2/fragmentshader5.glsl")
+fragment_src = readfile("./spheretracing/fragmentshader4.glsl")
 
-scene=readfile("./spheretracing2/scene3.glsl")
+scene=readfile("./scene.glsl")
 fragment_src=fragment_src.split("//cutoff")[0]+scene
 #print(fragment_src)
-with open("./spheretracing2/lastfragment.glsl","w")as f:
-    f.write(fragment_src)
 
 shader = compileProgram(
     compileShader(vertex_src, GL_VERTEX_SHADER),
@@ -119,9 +117,6 @@ def handle_keys(window):
     if glfw.get_key(window, glfw.KEY_LEFT_SHIFT) == glfw.PRESS:
         camera_speedlocal*=4
         rotspeed*=4
-    if glfw.get_key(window, glfw.KEY_SPACE) == glfw.PRESS:
-        camera_speedlocal*=0.01
-        rotspeed*=0.01
 
     if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:  # Move forward
         camera_pos += camera_speedlocal * camera_front

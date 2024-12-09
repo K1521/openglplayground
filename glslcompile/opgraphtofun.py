@@ -1,12 +1,11 @@
 
-
 import sys
 sys.path.append('./')
 import algebra.dcga as dcga
-sys.path.append('./opgraph')
-import opgraph3 as opg
-import math
-
+import opgraph as opg
+#import math
+from glslprog import glslprogrammpart
+from types import SimpleNamespace
 
 
 
@@ -33,14 +32,12 @@ def funtovisualize(x,y,z):
 def funtovisualize(x,y,z):
     return [(x*x+y*y-1)*(x*x+z*z-1)]
 
-def simplify(endpoint):
-    endpoint.replacenode(lambda x:x)#subexpressionelimination
-    endpoint.replacenode(lambda x:x.normalizenode())#normlization
-    endpoint.replacenode(lambda x:x.consteliminationnode())#simplify
-    endpoint.mergenodes()
-    endpoint.replacenode(lambda x:x.consteliminationnode())
+def strtopyfun(funstring):
+    local_vars = {}
+    exec(funstring, globals(), local_vars)
+    return SimpleNamespace(**local_vars)
 
-def stringifynodesglsl(endpoint):
+def makefuntailorglsl(endpoint):
     plan=endpoint.asplanstr(compact=True).replace("node","n").split("\n")
     last=list((plan.pop().split("Endpoint")[1][1:-1].replace(" ","").split(",")))
 
@@ -57,10 +54,17 @@ def stringifynodesglsl(endpoint):
             polyset.append(f"polys[{poly}][{param}]={last[param*numpolys+poly]};")
     #[[p1,p2][][]]
     polyset='\n'.join(polyset)
-    fundec=f"""
-const int numpolys={numpolys};
+    header="""
 const int numparams={numparams};
+const int numpolys={numpolys};
 float[numpolys][numparams] polys;
+float calcpolys(float x);
+float rootpolysquartic();
+void compilepolys(vec3 p,vec3 d);
+
+"""
+    body=f"""
+
 //float A;
 
 float calcpolys(float x){{
@@ -82,7 +86,7 @@ float calcpolys(float x){{
     }}
     return s;
 }}
-const float inf=pow(2,1024);
+
 
 float rootpolysquartic(){{
     float minx=inf;
@@ -112,9 +116,9 @@ float dz=d.z;
 
 """
 
-    return fundec
+    return glslprogrammpart(header,body,bodyprio=-10,headerprio=10)
 
-def stringifynodespy(endpoint):
+def makefuntailorpy(endpoint):
     plan=endpoint.asplanstr(compact=True).replace("node","n").split("\n")
     last=list((plan.pop().split("Endpoint")[1][1:-1].replace(" ","").split(",")))
 
@@ -143,43 +147,41 @@ def compilepolys(p,d):
 
 """
 
-    return fundec
+    return strtopyfun(fundec)
 
 
-ox,oy,oz,dx,dy,dz,a=[opg.VarNode(name) for name in "ox,oy,oz,dx,dy,dz,a".split(",")]
-x,y,z=ox+a*dx,oy+a*dy,oz+a*dz#defines a ray in 3d o+a*d where o is the start and d is the direction
+def makefuntailor(f):
+    ox,oy,oz,dx,dy,dz,a=[opg.VarNode(name) for name in "ox,oy,oz,dx,dy,dz,a".split(",")]
+    x,y,z=ox+a*dx,oy+a*dy,oz+a*dz#defines a ray in 3d o+a*d where o is the start and d is the direction
 
 
-endpoint=opg.EndpointNode(funtovisualize(x,y,z))
-simplify(endpoint)
-#print(endpoint.asplanstr(compact=True).replace("node","n"))
+    endpoint=opg.EndpointNode(funtovisualize(x,y,z))
+    opg.simplify(endpoint)
+    #print(endpoint.asplanstr(compact=True).replace("node","n"))
 
 
-derivatives=[endpoint.parents]
-for i in range(1,5):
-    #print( type(derivatives[-1][0]))
-    
-    derivatives.append([p.backpropergation([a])[0]/i for p in derivatives[-1]])
-# for i in enumerate(derivatives):
-#     f=math.factorial(i)
-#     d=derivatives[i]
-#     for j in range(len(d)):
-#         d[j]=d[j]/f
+    derivatives=[endpoint.parents]
+    for i in range(1,5):
+        #print( type(derivatives[-1][0]))
+        
+        derivatives.append([p.backpropergation([a])[0]/i for p in derivatives[-1]])
+    # for i in enumerate(derivatives):
+    #     f=math.factorial(i)
+    #     d=derivatives[i]
+    #     for j in range(len(d)):
+    #         d[j]=d[j]/f
 
-endpoint=opg.EndpointNode([opg.EndpointNode(d) for d in derivatives])
-simplify(endpoint)
+    endpoint=opg.EndpointNode([opg.EndpointNode(d) for d in derivatives])
+    opg.simplify(endpoint)
 
-#longendpoint=opg.EndpointNode([deriv for poly in zip(*[p.parents for p in endpoint.parents])for deriv in poly])
-longendpoint=opg.EndpointNode([params for deriv in endpoint.parents for params in deriv.parents])
-#print(stringifynodesglsl(longendpoint))
-fundec=stringifynodesglsl(longendpoint)
+    #longendpoint=opg.EndpointNode([deriv for poly in zip(*[p.parents for p in endpoint.parents])for deriv in poly])
+    longendpoint=opg.EndpointNode([params for deriv in endpoint.parents for params in deriv.parents])
+
+    fundecglsl=makefuntailorglsl(longendpoint)
 
 
-
-with open("./spheretracing2/scene3.glsl","w")as f:
-    f.write(fundec)
-with open("./spheretracing2/scene3.py","w")as f:
-    f.write(stringifynodespy(longendpoint))
-#print(fundec)
-#print(longendpoint.asplanstr(compact=True).replace("node","n"))
-print(stringifynodespy(longendpoint))
+    pyfun=makefuntailorpy(longendpoint)
+    #print(fundec)
+    #print(longendpoint.asplanstr(compact=True).replace("node","n"))
+    #print(makefuntailorpy(longendpoint))
+    return fundecglsl,pyfun

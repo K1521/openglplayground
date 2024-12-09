@@ -30,8 +30,8 @@ def funtovisualize(x,y,z):
     #e=sum(abs(x) for x in iprod.blades.values())
 
 
-def funtovisualize(x,y,z):
-    return [(x*x+y*y-1)*(x*x+z*z-1)]
+# def funtovisualize(x,y,z):
+#     return [(x*x+y*y-1)*(x*x+z*z-1)]
 
 def simplify(endpoint):
     endpoint.replacenode(lambda x:x)#subexpressionelimination
@@ -58,9 +58,7 @@ def stringifynodesglsl(endpoint):
     #[[p1,p2][][]]
     polyset='\n'.join(polyset)
     fundec=f"""
-const int numpolys={numpolys};
-const int numparams={numparams};
-float[numpolys][numparams] polys;
+
 //float A;
 
 float calcpolys(float x){{
@@ -82,7 +80,7 @@ float calcpolys(float x){{
     }}
     return s;
 }}
-const float inf=pow(2,1024);
+
 
 float rootpolysquartic(){{
     float minx=inf;

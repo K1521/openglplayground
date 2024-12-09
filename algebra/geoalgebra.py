@@ -34,7 +34,10 @@ class algebraspecification:
         return self.bladenamesep.join(self.bladenames[i] for i,x in enumerate(basisstr) if x=="1")
 
 
-
+def compute_parity(array):
+    if hasattr(np,"bitwise_count"):
+        return np.bitwise_count(array)&1
+    return np.vectorize(lambda x:int(x).bit_count()&1)(array)#np 1 support
 class tablealgebra(algebraspecification):
     def __init__(self, pnz, bladenames=None, bladenamesep=None):
         super().__init__(pnz, bladenames, bladenamesep, reversebits=True)
@@ -66,9 +69,9 @@ class tablealgebra(algebraspecification):
         #invert=np.bitwise_count(basis1acc&basis2)&1
         #invert^=np.bitwise_count(self.negativemask&basis1&basis2)&1
         
-        invert=np.bitwise_count(
+        invert=compute_parity(
             (basis1acc&basis2)^(self.negativemask&basis1&basis2)
-            )&1
+            )
         #invert=np.bitwise_count(
         #    ((basis1acc)^(self.negativemask&basis1))&basis2
         #    )&1

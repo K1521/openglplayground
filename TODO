@@ -1,8 +1,10 @@
 
 opgraph:
-abs,pow,sqrt
+abs,sqrt->done
+pow
 ausmultiplizieren
-ableitungen! interface verbessern
+ableitungen!->done 
+interface verbessern
 evaluate!
 numpy array support
 
@@ -12,9 +14,16 @@ marching cubes anhand von ableitungen
 vectorfeld visualisieren
 
 
-tracing2:
-anpassen mit ableitungen
+tracing:
+anpassen mit ableitungen->done
 analyse mit graphen
 rotate around point controlls+zoom  
 axen
-arbitrary variable modification
+arbitrary variable modification->done
+
+
+IMPORTANT
+read paper and implement stable solver
+search for solutions for multi blade
+Write aktuellen stand
+make classes for tracing components

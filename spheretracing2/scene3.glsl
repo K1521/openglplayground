@@ -1,7 +1,5 @@
 
-const int numpolys=1;
-const int numparams=5;
-float[numpolys][numparams] polys;
+
 //float A;
 
 float calcpolys(float x){
@@ -23,7 +21,7 @@ float calcpolys(float x){
     }
     return s;
 }
-const float inf=pow(2,1024);
+
 
 float rootpolysquartic(){
     float minx=inf;

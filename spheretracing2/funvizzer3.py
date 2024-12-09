@@ -25,8 +25,24 @@ poly=None
 
 def calcpoly(x):
     return poly[0]+poly[1]*x+poly[2]*x**2+poly[3]*x**3+poly[4]*x**4
-
-
+def calcpolyderiv(x):
+    return poly[1]+poly[2]*x/2+poly[3]*x**2/3+poly[4]*x**3/4
+def calcpoly2deriv(x):
+    return poly[2]/2+poly[3]*x/6+poly[4]*x**2/12
+def calcpolyderiv(x):
+    return poly[1]+poly[2]*x*2+poly[3]*x**2*3+poly[4]*x**3*4
+def calcpoly2deriv(x):
+    return poly[2]/2+poly[3]*x/6+poly[4]*x**2/12
+def newtoniter():
+    x=0
+    for i in range(20):
+        x-=calcpolyderiv(x)/calcpoly2deriv(x)
+    return x
+def newtoniter():
+    x=0
+    for i in range(20):
+        x-=calcpoly(x)/calcpolyderiv(x)
+    return x
 
 client=Client()
 
@@ -102,7 +118,9 @@ plt.plot(lin,lin*0)
 poly=compilepolys(camera_pos,fn)
 print(poly)
 
-poly=[poly[0],poly[1],poly[2],poly[3],poly[4]]
+#poly=[poly[0],poly[1],poly[2],poly[3],poly[4]]
+
+
 
 #print(solveQuartic(poly[4],poly[3],poly[2],poly[1],poly[0]))
 
@@ -111,13 +129,20 @@ poly=[poly[0],poly[1],poly[2],poly[3],poly[4]]
 #print(ray)
 e=calcpoly(lin.astype(np.float64))
 e2=calcpoly(lin.astype(np.float32))
-print(e[:10].dtype)
+
 
 
 
 #print(y)
 plt.plot(lin,e,label="e64")
 plt.plot(lin,e2,label="e32")
+
+shift=newtoniter()
+shift=-poly[3]/(4*poly[4])
+poly=compilepolys(camera_pos+fn*shift,fn)
+print(poly,shift)
+e2=calcpoly(lin.astype(np.float32))
+plt.plot(lin+shift,e2,label="es32")
 #plt.plot(lin,calcstep(fn.T,ray[:,None]).ravel(),label="step")
 
 #plt.plot(lin,2*e/(np.sum(xyz*fn,axis=-1)+np.linalg.norm(xyz,axis=-1)),label="stepnewton")

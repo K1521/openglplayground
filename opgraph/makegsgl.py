@@ -16,9 +16,9 @@ print(e.maxdepth())
 #e.simplify()
 e.replacenode(lambda x:x)#subexpressionelimination
 e.replacenode(lambda x:x.normalizenode())#normlization
-e.replacenode(lambda x:x.constelimination())#simplify
+e.replacenode(lambda x:x.consteliminationnode())#simplify
 e.mergenodes()
-e.replacenode(lambda x:x.constelimination())
+e.replacenode(lambda x:x.consteliminationnode())
 
 plan=e.asplanstr(compact=True).replace("node","n").split("\n")
 
