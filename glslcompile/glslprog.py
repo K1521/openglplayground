@@ -19,10 +19,11 @@ class glslprogrammpart:
         self.name=name
 class glslprogramm:
     def __init__(self,version=None):
-        self.parts: list[glslprogrammpart]=[]            
+        self.parts: list[glslprogrammpart]=[] 
+        self.version=version           
     def __str__(self):
         strparts=[]
-        if version is not None:
+        if self.version is not None:
             version=str(self.version).removeprefix("#").lstrip(" ").removeprefix("version").lstrip(" ")
             strparts.append(f"#version {version}")
 

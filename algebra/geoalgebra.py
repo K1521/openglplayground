@@ -181,7 +181,12 @@ def iszerro(x):
         return x==0
     if isinstance(x,np.ndarray):
         return np.allclose(x,0,rtol=1E-13)
-    return x==0
+    
+    # try:
+    #     return x==0
+    # except RuntimeError:
+    #     pass
+    # return False
 def dictreomove0s(d):
     return {k:v for k,v in d.items() if not iszerro(v)} 
 

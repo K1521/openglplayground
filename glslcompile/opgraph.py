@@ -114,6 +114,8 @@ class OpNode:
         return "\n".join(nodestr)
     
     def backpropergation(self,variables=None):  
+        if not isinstance(variables,list):
+            return self.backpropergation([variables])[0]
         zero=ConstNode(0)
         doutdnode=defaultdict(lambda:zero)
         doutdnode[self]=ConstNode(1)#set derivative for output node
@@ -514,11 +516,20 @@ class DivNode(OpNode):
 
 
 def simplify(endpoint):
+    if isinstance(endpoint,list):
+        return simplify(EndpointNode(endpoint)).parents
+    if not isinstance(endpoint,OpNode):
+        raise ValueError("input must be a list of nodes or a singular node")
+    if not isinstance(endpoint,EndpointNode):
+        return simplify([endpoint])[0]
+
+
     endpoint.replacenode(lambda x:x)#subexpressionelimination
     endpoint.replacenode(lambda x:x.normalizenode())#normlization
-    endpoint.replacenode(lambda x:x.consteliminationnode())#simplify
-    endpoint.mergenodes()
-    endpoint.replacenode(lambda x:x.consteliminationnode())
+    endpoint.replacenode(lambda x:x.consteliminationnode())#remove constant expressions
+    endpoint.mergenodes()#merges nodes eg (a+(b+c)) to (a+b+c)
+    endpoint.replacenode(lambda x:x.consteliminationnode())# 
+    return endpoint
 
 if __name__=="__main__":
     import sys

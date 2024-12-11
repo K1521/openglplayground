@@ -14,6 +14,5 @@ outputs = ca.vertcat(y1, y2)
 # Create a CasADi function
 f = ca.Function('f', [x, y, z, a], [outputs])
 
-# Export the graph
-print(f)
+
 f.disp(True)

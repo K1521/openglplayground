@@ -1,13 +1,13 @@
 
-import sys
-sys.path.append('./')
-import algebra.dcga as dcga
+
 import opgraph as opg
 #import math
 from glslprog import glslprogrammpart
 from types import SimpleNamespace
 
-
+import sys
+sys.path.append('./')
+import algebra.dcga as dcga
 
 
 def funtovisualize(x,y,z):
@@ -54,7 +54,7 @@ def makefuntailorglsl(endpoint):
             polyset.append(f"polys[{poly}][{param}]={last[param*numpolys+poly]};")
     #[[p1,p2][][]]
     polyset='\n'.join(polyset)
-    header="""
+    header=f"""
 const int numparams={numparams};
 const int numpolys={numpolys};
 float[numpolys][numparams] polys;
@@ -155,32 +155,24 @@ def makefuntailor(f):
     x,y,z=ox+a*dx,oy+a*dy,oz+a*dz#defines a ray in 3d o+a*d where o is the start and d is the direction
 
 
-    endpoint=opg.EndpointNode(funtovisualize(x,y,z))
-    opg.simplify(endpoint)
+    funcgraphoutputs=f(x,y,z)# 
+    funcgraphoutputs=opg.simplify(funcgraphoutputs)
     #print(endpoint.asplanstr(compact=True).replace("node","n"))
 
 
-    derivatives=[endpoint.parents]
+    derivatives=[funcgraphoutputs]
     for i in range(1,5):
         #print( type(derivatives[-1][0]))
         
-        derivatives.append([p.backpropergation([a])[0]/i for p in derivatives[-1]])
-    # for i in enumerate(derivatives):
-    #     f=math.factorial(i)
-    #     d=derivatives[i]
-    #     for j in range(len(d)):
-    #         d[j]=d[j]/f
-
-    endpoint=opg.EndpointNode([opg.EndpointNode(d) for d in derivatives])
-    opg.simplify(endpoint)
-
-    #longendpoint=opg.EndpointNode([deriv for poly in zip(*[p.parents for p in endpoint.parents])for deriv in poly])
-    longendpoint=opg.EndpointNode([params for deriv in endpoint.parents for params in deriv.parents])
-
-    fundecglsl=makefuntailorglsl(longendpoint)
+        derivatives.append([p.backpropergation(a)/i for p in derivatives[-1]])
+        #TODO use forward mode auto diff. should be faster and simpler
 
 
-    pyfun=makefuntailorpy(longendpoint)
+    derivflatt=opg.EndpointNode([param for deriv in derivatives for param in deriv])
+    derivflatt=opg.simplify(derivflatt)
+
+    fundecglsl=makefuntailorglsl(derivflatt)
+    pyfun=makefuntailorpy(derivflatt)
     #print(fundec)
     #print(longendpoint.asplanstr(compact=True).replace("node","n"))
     #print(makefuntailorpy(longendpoint))
