@@ -24,10 +24,15 @@ class Server:
                 match msg:
                     case ("getvariable", varname):
                         # Check if the variable exists in globals
-                        if varname in mainglobals:
-                            conn.send(("getvariableanswer", True, varname, mainglobals[varname]))
-                        else:
+                        try:
+                            varnames=varname.split(".")
+                            value=mainglobals[varnames.pop(0)]
+                            for v in varnames:
+                                value=value.__getattribute__(v)
+                        except Exception as e:
                             conn.send(("getvariableanswer", False, varname, "Variable not found"))
+                        else:
+                            conn.send(("getvariableanswer", True, varname,value))
                     case ("setvariable", varname, value):
                         # Set the variable in globals
                         self.variableupdates+=1

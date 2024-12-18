@@ -41,7 +41,7 @@ def makefuntailorglsl(endpoint):
     plan=endpoint.asplanstr(compact=True).replace("node","n").split("\n")
     last=list((plan.pop().split("Endpoint")[1][1:-1].replace(" ","").split(",")))
 
-    plangsgl="\n".join([f"float {l};" for l in plan])
+    plangsgl="\n".join([f"double {l};" for l in plan])
 
     #last="\nreturn ("+"+".join([f"{l}" for l in last])+");"
     #last="\nreturn sqrt("+"+".join([f"abs({l})" for l in last])+");"
@@ -57,58 +57,19 @@ def makefuntailorglsl(endpoint):
     header=f"""
 const int numparams={numparams};
 const int numpolys={numpolys};
-float[numpolys][numparams] polys;
-float calcpolys(float x);
-float rootpolysquartic();
+const int degree=numparams-1;
+double[numpolys][numparams] polys;
 void compilepolys(vec3 p,vec3 d);
 
 """
     body=f"""
-
-//float A;
-
-float calcpolys(float x){{
-    //x-=A;
-    float[numparams] pows;
-    pows[0]=1;
-    for(int j=1;j<numparams;j++){{
-        pows[j]=pows[j-1]*x;
-    }}
-
-    float s=0;
-    for(int i=0;i<numpolys;i++){{
-        float[numparams] poly=polys[i];
-        float d=0;
-        for (int j = 0; j < numparams; j++) {{
-            d += poly[j] * pows[j];
-        }}
-        s+=abs(d);
-    }}
-    return s;
-}}
-
-
-float rootpolysquartic(){{
-    float minx=inf;
-    vec4 roots=solveQuartic(polys[0][4],polys[0][3],polys[0][2],polys[0][1],polys[0][0]);
-    for(int i=0;i<4;i++){{
-        float root=roots[i];
-        if((!isnan(root)) && root>0){{
-            minx=min(minx,root);
-        }}
-    }}
-    return minx;
-}}
-
-//void compilepolys(vec3 p,vec3 d,float a){{
 void compilepolys(vec3 p,vec3 d){{
-float a=0;
-float ox=p.x;
-float oy=p.y;
-float oz=p.z;
-float dx=d.x;
-float dy=d.y;
-float dz=d.z;
+double ox=p.x;
+double oy=p.y;
+double oz=p.z;
+double dx=d.x;
+double dy=d.y;
+double dz=d.z;
 {plangsgl}
 {polyset}
 }}
@@ -147,7 +108,7 @@ def compilepolys(p,d):
 
 """
 
-    return strtopyfun(fundec)
+    return fundec
 
 
 def makefuntailor(f):

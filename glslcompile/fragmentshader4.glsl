@@ -14,6 +14,7 @@ const float FOVfactor=1/tan(radians(FOV) * 0.5);
 const float EPSILON_RAYMARCHING=0.001;
 const float EPSILON_NORMALS=0.001;
 const float EPSILON_DERIV=0.0001;
+const float EPSILON_ROOTS=0.001;
 const int MAX_RAY_ITER=128;
 
 const float nan=sqrt(-1);
@@ -62,6 +63,18 @@ float sum(vec3 v) {
 }
 bool any(bvec3 b) {
     return b.x || b.y || b.z;
+}
+
+float vmin(vec4 x){
+    float minx=inf;
+
+    for(int i=0;i<4;i++){
+        float a=x[i];
+        if(!isnan(a)){
+            minx=min(minx,a);
+        }
+    }
+    return minx;
 }
 
 
@@ -211,19 +224,125 @@ vec4 solveQuartic(float a, float b, float c, float d, float e) {
 }
 
 
+double evaluatePolynomial(double x, double[numparams] polyparams) {
+    double result = polyparams[degree];
+    for (int i = degree - 1; i >= 0; i--) {
+        result = result * x + polyparams[i];
+    }
+    return result;
+}
+double evaluatePolynomialDerivative(double x, double[numparams] polyparams) {
+    double result = polyparams[degree]*degree;
+    for (int i = degree - 1; i >= 1; i--) {
+        result = result * x + polyparams[i]*i;
+    }
+    return result;
+}
+vec2 evaluatePolynomialAndDerivativef(float x, float[numparams] polyparams) {
+    float resultd = polyparams[degree]*degree;
+    float result = polyparams[degree];
+    for (int i = degree - 1; i >= 1; i--) {
+        resultd = resultd * x + polyparams[i]*i;
+        result = result * x + polyparams[i];
+    }
+    result = result * x + polyparams[0];
+    return vec2(result,resultd);
+}
+
+dvec2 newtonroot(int iter,double x,double[numparams] polyparams){
+    double shift=x;
+    double bestval=inf;
+    for(int i=0;i<iter;i++){
+        double f=evaluatePolynomial(x,polyparams);
+        double df=evaluatePolynomialDerivative(x,polyparams);
+        if(x>=0.0 && abs(f)<bestval){
+            bestval=abs(f);
+            shift=x;
+        }
+        if(bestval<EPSILON_ROOTS)break;
+        x-=f/df;
+    }
+    return dvec2(shift,bestval);
+}
+
+vec2 newtonrootf(int iter,float x,double[numparams] polyparams){
+    float[numparams] polyparamsf;
+    for(int i=0;i<numparams;i++){polyparamsf[i]=float(polyparams[i]);}
+    float shift=x;
+    float bestval=inf;
+    for(int i=0;i<iter;i++){
+        vec2 f_df=evaluatePolynomialAndDerivativef(x,polyparamsf);
+        float absf=abs(f_df.x);
+        if(x>=0.0 && absf<bestval){
+            bestval=absf;
+            shift=x;
+        }
+        if(bestval<EPSILON_ROOTS)break;
+        x-=f_df.x/f_df.y;
+    }
+    return vec2(shift,bestval);
+}
+
+int findroots2(double[numparams] polyparams,out double[degree] roots){
+    //tries to find all roots>0 and refines them with newton method.
+    //returns number of found roots
+    dvec2 r=newtonrootf(100,0.0,polyparams);
+    if(r.x<0)return 0;
+    roots[0]=r.x;
+    return 1;
+}
+
+int findroots(double[numparams] polyparams,out double[degree] roots){
+    //tries to find all roots>0 and refines them with newton method.
+    //returns number of found roots
+    vec4 qroots= solveQuartic(float(polyparams[4]),float(polyparams[3]),float(polyparams[2]),float(polyparams[1]),float(polyparams[0]));
+    int numroots=0;
+    for(int i=0;i<4;i++){
+        if(qroots[i]>0){
+            //dvec2 result=dvec2(newtonrootf(10,qroots[i],polyparams));
+            dvec2 result=newtonroot(10,qroots[i],polyparams);//changed
+            if(result.y<EPSILON_ROOTS)
+            roots[numroots++]=result.x;
+        }
+    }
+    return numroots;
+}
+
+float findcommonroot(){
+    double[degree] roots;
+    //TODO Check if the polynom is 0 everywhere and if so chose the next polynom
+    int numroots=findroots2(polys[0],roots);//find the roots of the first polynom
+
+    for(int i=1;i<numpolys;i++){
+        int numrootsneu=0;
+        for(int j=0;j<numroots;j++){//check if it is a common root
+            if(evaluatePolynomial(roots[j],polys[i])<EPSILON_ROOTS)
+                roots[numrootsneu++]=roots[j];
+        }
+        numroots=numrootsneu;
+        //TODO performance test Shift empty vs Transposed loop
+    }
+
+    double smallestroot=inf;
+    for(int j=0;j<numroots;j++){
+        smallestroot=min(smallestroot,roots[j]);
+    }
+    return float(smallestroot);
+}
+
+
+
 float raymarch(vec3 rayDir, inout vec3 rayOrigin) {
-    
-    float x=0;
+    compilepolys(rayOrigin,rayDir);
+    float x=findcommonroot();
     
 
-    compilepolys(rayOrigin,rayDir);
-    x=rootpolysquartic();
-    /*if(isinf(x)){
-        raymarch2(rayDir,rayOrigin);
-    }*/
     rayOrigin += rayDir * x;
-    return 0;
+    return float(evaluatePolynomial(x,polys[0]));
 }
+
+
+
 
 
 
@@ -245,31 +364,32 @@ void main() {
     
     // Checkerboard pattern
     float checker = 0.3 + 0.7 * mod(sum(floor(p * 4.0)), 2.0); // Alternates between 0.5 and 1.0
+    //float checker = 0.3 + 0.7 * mod(sum(floor(p/(length(p-rayOrigin)/100+1) * 4.0)), 2.0);
     
     vec3 col=vec3(checker);
     //col=vec3(1);
-    col*=normaltocol(transpose(cameraMatrix)*getNormal(p));
+    col*=1;//normaltocol(transpose(cameraMatrix)*getNormal(p));
     //col=vec3(abs());
-    col=getlight(p,rayDir,col);
+    //col=getlight(p,rayDir,col);
     //col=pow(col,vec3(0.4545));//gamma correction
     //col=pow(col,vec3(2));
 
     if ((dist < EPSILON_RAYMARCHING)) {
 
     } else {
-        col*=vec3(1,0.5,0.5);
+        col*=vec3(1,0.5,0.5);//red tint
         
         //color = vec4(0.0, 0.0, 0.0, 1.0); // Background
     }
     
     if(any(isnan(col))){
-        col=vec3(0);//vec3(1,1,0);
+        col=vec3(1,1,0);//nan is yellow
     }
     if(any(isinf(vec3(p))) || abs(p.x)>10E10||abs(p.y)>10E10||abs(p.z)>10E10){
-        col=vec3(0);//vec3(0,0,0.5);
+        col=vec3(0,0,0.5);//blue
     }
     //if(length(uv)<0.01){col*=vec3(0.7,1,0.7);}//dot in middle of screen
-    if(length(uv)<0.01 && length(uv)>0.005){col=vec3(0.5,1,0.5);}
+    if(length(uv)<0.01 && length(uv)>0.005){col=vec3(0.5,1,0.5);}//circle in middle of screen
 
     color= vec4(col,1);
 }
