@@ -309,7 +309,7 @@ int findroots(double[numparams] polyparams,out double[degree] roots){
     return numroots;
 }
 
-float findcommonroot(){
+float findcommonroot(dpolys polys){
     double[degree] roots;
     //TODO Check if the polynom is 0 everywhere and if so chose the next polynom
     int numroots=findroots2(polys[0],roots);//find the roots of the first polynom
@@ -334,8 +334,9 @@ float findcommonroot(){
 
 
 float raymarch(vec3 rayDir, inout vec3 rayOrigin) {
-    compilepolys(rayOrigin,rayDir);
-    float x=findcommonroot();
+    dpolys polys;
+    compilepolys(rayOrigin,rayDir,polys);
+    float x=findcommonroot(polys);
     
 
     rayOrigin += rayDir * x;

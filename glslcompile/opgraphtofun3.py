@@ -41,7 +41,7 @@ def makefuntailorglsl(endpoint,dtype="double"):
     plan=endpoint.asplanstr(compact=True).replace("node","n").split("\n")
     last=list((plan.pop().split("Endpoint")[1][1:-1].replace(" ","").split(",")))
 
-    plangsgl="\n".join([f"dpoly {l};" for l in plan])
+    plangsgl="\n".join([f"dnum {l};" for l in plan])
 
     #last="\nreturn ("+"+".join([f"{l}" for l in last])+");"
     #last="\nreturn sqrt("+"+".join([f"abs({l})" for l in last])+");"
@@ -58,19 +58,22 @@ def makefuntailorglsl(endpoint,dtype="double"):
 const int numparams={numparams};
 const int numpolys={numpolys};
 const int degree=numparams-1;
-#define dpoly {dtype}
-dpoly[numpolys][numparams] polys;
-void compilepolys(vec3 p,vec3 d);
+#define dnum {dtype}
+#define dpoly dnum[numparams]
+#define dpolys dnum[numpolys][numparams]
+
+
+void compilepolys(vec3 p,vec3 d,out dpolys polys);
 
 """
     body=f"""
-void compilepolys(vec3 p,vec3 d){{
-dpoly ox=p.x;
-dpoly oy=p.y;
-dpoly oz=p.z;
-dpoly dx=d.x;
-dpoly dy=d.y;
-dpoly dz=d.z;
+void compilepolys(vec3 p,vec3 d,out dpolys polys){{
+dnum ox=p.x;
+dnum oy=p.y;
+dnum oz=p.z;
+dnum dx=d.x;
+dnum dy=d.y;
+dnum dz=d.z;
 {plangsgl}
 {polyset}
 }}
