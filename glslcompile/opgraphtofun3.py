@@ -107,9 +107,6 @@ def compilepolys(p,d):
     dz=d[2]
 {planpy}
     return {",".join(last)}
-
-
-
 """
 
     return fundec

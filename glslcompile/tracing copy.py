@@ -1,6 +1,6 @@
 import tracing_helper
 import numpy as np
-import opgraphtofun3 as opgraphtofun
+import opgraphtofun2 as opgraphtofun
 import glslprog
 import sys
 sys.path.append('./')
@@ -30,11 +30,11 @@ def funtovisualize(x,y,z):
     iprod=point.inner(obj)
     return list(iprod.blades.values())
 #import opgraphtofuncasadi
-scene,pyfun=opgraphtofun.makefuntailor(funtovisualize,"float")
+scene,pyfun=opgraphtofun.makefuntailor(funtovisualize,"double")
 
 #scene=opgraphtofuncasadi.generate_glsl_code(funtovisualize)
 prog=glslprog.glslprogramm(version="440")
-prog.parts.append(glslprog.glslprogrammpart(bodypath="./glslcompile/fragmentshader6.glsl"))
+prog.parts.append(glslprog.glslprogrammpart(bodypath="./glslcompile/fragmentshader3.glsl"))
 prog.parts.append(scene)
 
 

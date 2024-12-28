@@ -206,6 +206,8 @@ class bladedict:
                 return other
         return self.frombasis(0,other)
     def frombasis(self,basis=0,value=1):
+        if isinstance(basis,dict):#from basis value dict
+            return bladedict(self.algebra,basis)
         return bladedict(self.algebra,{basis:value})
     def __add__(self,other):
         other=self.convert(other)
