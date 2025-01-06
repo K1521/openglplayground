@@ -37,7 +37,7 @@ prog=glslprog.glslprogramm(version="440")
 prog.parts.append(glslprog.glslprogrammpart(bodypath="./glslmatrixeval/fragmentshader6.glsl"))
 prog.parts.append(glslprog.glslprogrammpart(header=f"""
 const int polybasislength={len(tracer.poly_basis_monoms)};
-const ivec3[polybasislength] polybasis={{{f",".join(f"{{{monom.x},{monom.y},{monom.z}}}"for monom in tracer.poly_basis_monoms)}}};
+ivec3[polybasislength] polybasis={{{f",".join(f"{{{monom.x},{monom.y},{monom.z}}}"for monom in tracer.poly_basis_monoms)}}};//const is slower
 const int numpolys={len(funmat)};
 const int MAXPOLYDEGREE={max(monom.degree() for monom in tracer.poly_basis_monoms)};
 """))
@@ -76,10 +76,11 @@ window.loopcallbacks.append(updatemat())
 
 
 
-import cProfile
+import cProfile,pstats
 profiler=cProfile.Profile()
 with profiler:
     for i in range(30):
         window.loopiter()
         window.variables["cameraPos"]+=np.array([0,0.03,0])
-profiler.print_stats("tottime")
+#profiler.print_stats("tottime")
+pstats.Stats(profiler).strip_dirs().sort_stats("tottime").print_stats(7)
