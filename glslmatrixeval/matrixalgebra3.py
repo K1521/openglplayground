@@ -7,6 +7,15 @@ class MonomXYZ:
     Z: "MonomXYZ" = None
     ONE: "MonomXYZ" = None
     __slots__=("powers","_hash")
+
+    @property
+    def x(self):return self.powers[0]
+
+    @property
+    def y(self):return self.powers[1]
+
+    @property
+    def z(self):return self.powers[2]
     
     def __init__(self, powers):
         self.powers = powers

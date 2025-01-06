@@ -82,11 +82,20 @@ class ShaderVariables:
             if variable.lastupdate >= self.lastupload:
                 anychanged=True
                 location = glGetUniformLocation(self.shader, key)
+                print(key,location)
                 value = variable.value
                 vtype = variable.vartype
 
-                if vtype == "float":
+                if   vtype == "float":
                     glUniform1f(location, value)
+                elif vtype == "glUniform1fv":
+                    #value=value.ravel()
+                    #print(self.shader,key,location,value)
+                    glUniform1fv(location,value.size, value)
+                elif vtype == "glUniform1iv":
+                    glUniform1iv(location,len(value),value)
+                elif vtype == "glUniform3iv":
+                    glUniform3iv(location,len(value), value)
                 elif vtype == "vec2":
                     glUniform2f(location, *value)
                 elif vtype == "vec3":
@@ -130,6 +139,7 @@ class mywindow:
 
         self.variables["cameraPos"] = np.array([0.0, 0.0, -5.0], dtype=np.float32)  # Camera position
         self.variables["cameraMatrix"]=np.eye(3)#cam to world
+        self.variables["windowsize"]=self.windowsize
     
     @property
     def camera_pos(self):
@@ -150,9 +160,9 @@ class mywindow:
     def loop(self):
         glUseProgram(self.shader)
         
-        glUniform2f(glGetUniformLocation(self.shader, "windowsize"), *self.windowsize)
-        glUniform3f(glGetUniformLocation(self.shader, "lookat"), 0.0, 0.0, 0.0)
-        glUniform3f(glGetUniformLocation(self.shader, "lightPos"), 5.0, 5.0, -5.0)
+        
+        #glUniform3f(glGetUniformLocation(self.shader, "lookat"), 0.0, 0.0, 0.0)
+        #glUniform3f(glGetUniformLocation(self.shader, "lightPos"), 5.0, 5.0, -5.0)
         while not glfw.window_should_close(self.window):
             self.loopiter()
         glfw.terminate()
