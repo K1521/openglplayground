@@ -1,12 +1,3 @@
-#version 440
-/*source=part1*/
-
-const int polybasislength=35;
-const ivec3[polybasislength] polybasis={{0,0,0},{1,0,0},{0,1,0},{0,0,1},{2,0,0},{1,1,0},{1,0,1},{0,2,0},{0,1,1},{0,0,2},{3,0,0},{2,1,0},{2,0,1},{1,2,0},{1,1,1},{1,0,2},{0,3,0},{0,2,1},{0,1,2},{0,0,3},{4,0,0},{3,1,0},{3,0,1},{2,2,0},{2,1,1},{2,0,2},{1,3,0},{1,2,1},{1,1,2},{1,0,3},{0,4,0},{0,3,1},{0,2,2},{0,1,3},{0,0,4}};
-const int numpolys=1;
-const int MAXPOLYDEGREE=4;
-
-/*source=part0*/
 //const int polybasislength=...;
 //const ivec3[polybasislength] polybasis=...;
 //const int numpolys=...;
@@ -290,80 +281,6 @@ void linearizepolyxyz(int i,vec3 rayDir,out float[MAXPOLYDEGREE+1] coefficients)
     }
 }
 
-/*
-m[j].w=x**polybasis[j].x*y**polybasis[j].y*z**polybasis[j].z
-m[j].x=d/dx (x**polybasis[j].x*y**polybasis[j].y*z**polybasis[j].z)
-m[j].y=d/dy (x**polybasis[j].x*y**polybasis[j].y*z**polybasis[j].z)
-m[j].z=d/dz (x**polybasis[j].x*y**polybasis[j].y*z**polybasis[j].z)
-*/
-
-float gaussneewton(inout vec3 pos){
-    // Arrays to store the powers of x, y, z for all degrees up to MAXPOLYDEGREE
-    float[MAXPOLYDEGREE+1] powersx;
-    float[MAXPOLYDEGREE+1] powersy;
-    float[MAXPOLYDEGREE+1] powersz;
-    powersx[0]=1.0;
-    powersy[0]=1.0;
-    powersz[0]=1.0;
-    for(int i=0;i<MAXPOLYDEGREE;i++){
-        powersx[i+1]=powersx[i]*pos.x;
-        powersy[i+1]=powersy[i]*pos.y;
-        powersz[i+1]=powersz[i]*pos.z;
-    }
-
-    // Matrix m will hold the values of the terms for each polynomial basis
-    vec4[polybasislength] m;
-
-    for(int j=0;j<polybasislength;j++){
-        ivec3 basis=polybasis[j];
-        float px=powersx[basis.x];
-        float py=powersy[basis.y];
-        float pz=powersz[basis.z];
-        float pdx = (basis.x > 0) ? basis.x * powersx[basis.x - 1] : 0.0;
-        float pdy = (basis.y > 0) ? basis.y * powersy[basis.y - 1] : 0.0;
-        float pdz = (basis.z > 0) ? basis.z * powersz[basis.z - 1] : 0.0;
-
-        // Store the results in the matrix m:
-        // m[j].w = x^basis.x * y^basis.y * z^basis.z
-        // m[j].x = d/dx (x^basis.x * y^basis.y * z^basis.z)
-        // m[j].y = d/dy (x^basis.x * y^basis.y * z^basis.z)
-        // m[j].z = d/dz (x^basis.x * y^basis.y * z^basis.z)
-        m[j]=vec4(pdx*py*pz,px*pdy*pz,px*py*pdz,px*py*pz);
-    }
-
-    float xx=0;
-    float xy=0;
-    float xz=0;
-    float yy=0;
-    float yz=0;
-    float zz=0;
-    vec3 JTf=vec3(0);
-    float w=0;
-
-    for(int i=0;i<numpolys;i++){
-        vec4 s=vec4(0);
-        for(int j=0;j<polybasislength;j++){
-            s+=m[j]*coefficientsxyz[i][j];
-        }
-        xx+=s.x*s.x;
-        xy+=s.x*s.y;
-        xz+=s.x*s.z;
-        yy+=s.y*s.y;
-        yz+=s.y*s.z;
-        zz+=s.z*s.z;
-        JTf+=s.w*s.xyz;
-        w+=s.w*s.w;
-    }
-
-    mat3 JTJ=mat3(xx,xy,xz,xy,yy,yz,xz,yz,zz);
-
-    //JTJ+=mat3(1,0,0,0,1,0,0,0,1)*1E-5;
-
-    pos-=inverse(JTJ)*JTf;
-    return sqrt(w);
-
-}
-
 int calcdegree(float[MAXPOLYDEGREE+1] coefficients){
     int pdegree=MAXPOLYDEGREE;
     while(pdegree >= 1 && (abs(coefficients[pdegree]) < 1E-12))pdegree--;
@@ -377,50 +294,6 @@ int findroots(out dcomplex[MAXPOLYDEGREE] roots,float[MAXPOLYDEGREE+1] coefficie
     initial_roots(roots,dcomplex(guessx,0));
     aberth_method(roots,coefficients,pdegree);
     return pdegree;
-}
-
-float raymarch3(vec3 rayDir, inout vec3 rayOrigin) {
-    
-    
-    float[MAXPOLYDEGREE+1] coefficients;
-    linearizepolyxyz(0,rayDir,coefficients);
-    dcomplex[MAXPOLYDEGREE] roots;
-    vec3[MAXPOLYDEGREE] roots3d;
-    
-    int pdegree=findroots(roots,coefficients);
-
-    float x=inf;
-    float error=inf;
-
-    for(int i=0;i<pdegree;i++){
-        /*vec3 pos=rayDir * roots[i].x;
-        vec3 posinitial=pos;
-        gaussneewton(pos);
-        float e=gaussneewton(pos);
-        float xguess=dot(rayDir,pos);
-        if(e<0.1 && length(pos-posinitial)<0.1 && x>xguess && xguess>0){
-            error=e;
-            x=xguess;
-        }*/
-
-        vec3 pos=vec3(0);//rayDir * roots[i].x;
-        vec3 posinitial=pos;
-        for(int j=0;j<10;j++){
-            gaussneewton(pos);
-            vec3 pos=dot(rayDir,pos)*rayDir;
-        }
-        float e=gaussneewton(pos);
-        float xguess=dot(rayDir,pos);
-        if(x>xguess && xguess>0){
-            error=e;
-            x=xguess;
-        }
-
-        
-    }
-
-    rayOrigin += rayDir * x;
-    return error;
 }
 
 float raymarch(dintervall u, dintervall v,vec3 rayDir, inout vec3 rayOrigin) {
@@ -564,15 +437,14 @@ float raymarch2(dintervall u, dintervall v,vec3 rayDir, inout vec3 rayOrigin) {
 void main() {
     vec2 uv=(2*gl_FragCoord.xy-windowsize)/windowsize.x;
     vec3 rayOrigin = cameraPos;
-    vec3 rayDir =normalize(vec3(uv, FOVfactor));//cam to view
+    vec3 rayDir =vec3(uv, 1);//cam to view
     dintervall u = (2.0 * gl_FragCoord.x - windowsize.x+vec2(-1,1)) / windowsize.x;
     dintervall v = (2.0 * gl_FragCoord.y - windowsize.y+vec2(-1,1)) / windowsize.x;
 
     // Sphere tracing
 
     vec3 p=vec3(0);//rayOrigin;
-    //float dist=raymarch(u,v,rayDir,p);
-    float dist=raymarch3(rayDir,p);
+    float dist=raymarch(u,v,rayDir,p);
     p=(cameraMatrix)*p+rayOrigin;
 
 

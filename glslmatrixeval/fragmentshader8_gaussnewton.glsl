@@ -1,12 +1,3 @@
-#version 440
-/*source=part1*/
-
-const int polybasislength=35;
-const ivec3[polybasislength] polybasis={{0,0,0},{1,0,0},{0,1,0},{0,0,1},{2,0,0},{1,1,0},{1,0,1},{0,2,0},{0,1,1},{0,0,2},{3,0,0},{2,1,0},{2,0,1},{1,2,0},{1,1,1},{1,0,2},{0,3,0},{0,2,1},{0,1,2},{0,0,3},{4,0,0},{3,1,0},{3,0,1},{2,2,0},{2,1,1},{2,0,2},{1,3,0},{1,2,1},{1,1,2},{1,0,3},{0,4,0},{0,3,1},{0,2,2},{0,1,3},{0,0,4}};
-const int numpolys=1;
-const int MAXPOLYDEGREE=4;
-
-/*source=part0*/
 //const int polybasislength=...;
 //const ivec3[polybasislength] polybasis=...;
 //const int numpolys=...;
@@ -345,12 +336,7 @@ float gaussneewton(inout vec3 pos){
         for(int j=0;j<polybasislength;j++){
             s+=m[j]*coefficientsxyz[i][j];
         }
-        xx+=s.x*s.x;
-        xy+=s.x*s.y;
-        xz+=s.x*s.z;
-        yy+=s.y*s.y;
-        yz+=s.y*s.z;
-        zz+=s.z*s.z;
+        x +=s.z*s.z;
         JTf+=s.w*s.xyz;
         w+=s.w*s.w;
     }
