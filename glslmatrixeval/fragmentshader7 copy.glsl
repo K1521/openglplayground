@@ -293,13 +293,14 @@ float raymarch(vec3 rayDir, inout vec3 rayOrigin) {
 void main() {
     vec2 uv=(2*gl_FragCoord.xy-windowsize)/windowsize.x;
     vec3 rayOrigin = cameraPos;
-    vec3 rayDir =cameraMatrix* normalize(vec3(uv, FOVfactor));//cam to view
+    vec3 rayDir =normalize(vec3(uv, FOVfactor));//cam to view
 
 
     // Sphere tracing
 
-    vec3 p=rayOrigin;//vec3(0);//rayOrigin;
+    vec3 p=vec3(0);//rayOrigin;
     float dist=raymarch(rayDir,p);
+    p=(cameraMatrix)*p+rayOrigin;
 
 
         

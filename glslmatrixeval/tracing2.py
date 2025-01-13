@@ -17,8 +17,8 @@ tracer=TraceBasis(dcga.point)
 
 def funtoviz(point):
     obj=dcga.toroid(2,0.5)
-    #obj=dcga.Plane(1,1,1,1)
-    #obj=dcga.Plane(1,1,1,0.01).outer(dcga.toroid(2,0.5))
+    #obj=dcga.Plane(1,1,1,0.01)
+    #obj=dcga.Plane(1,1,1,0.01).inner(dcga.toroid(2,0.5))
 
     #obj=sanwich(t,obj)
     prod=point.inner(obj)
@@ -34,7 +34,7 @@ print(funmat)
 #print(tracer.poly_basis_monoms)
 #scene=opgraphtofuncasadi.generate_glsl_code(funtovisualize)
 prog=glslprog.glslprogramm(version="440")
-prog.parts.append(glslprog.glslprogrammpart(bodypath="./glslmatrixeval/fragmentshader6.glsl"))
+prog.parts.append(glslprog.glslprogrammpart(bodypath="./glslmatrixeval/fragmentshader8_gaussnewton.glsl"))
 prog.parts.append(glslprog.glslprogrammpart(header=f"""
 const int polybasislength={len(tracer.poly_basis_monoms)};
 const ivec3[polybasislength] polybasis={{{f",".join(f"{{{monom.x},{monom.y},{monom.z}}}"for monom in tracer.poly_basis_monoms)}}};
@@ -53,7 +53,7 @@ window=tracing_helper.mywindow(800,600,fragment_src)
 #window.variables.additem(key,value,"glUniform1fv")
 #window.variables.additem(key,value,"glUniform1iv")
 tracing_helper.keymouseeventhandler(window)
-mat=(funmat@tracer.point_mat@tracer.move_basis(0,0,0)).ravel()
+mat=(funmat@tracer.point_mat@tracer.move_basis(0,0,0))
 print(mat)
 window.variables.additem("coefficientsxyz[0][0]",mat,"glUniform1fv")
 
@@ -65,10 +65,12 @@ class updatemat:
 
     def __call__(self):
         campos=window.variables.variables["cameraPos"]
-        update=campos.lastupdate
+        c2w=window.variables.variables["cameraMatrix"]
+        update=max(campos.lastupdate,c2w.lastupdate)
         if update!=self.lastupdate:
-            self.lastupdate=update
-            mat=(self.m1@tracer.move_basis(*(campos.value)))
+            self.lastupdate=update  
+            mat=(self.m1@tracer.transform_basis(c2w.value,campos.value))
+            #mat=(self.m1@tracer.move_basis(*(campos.value)))
             window.variables["coefficientsxyz[0][0]"]=mat
 window.loopcallbacks.append(updatemat())
 
@@ -81,9 +83,10 @@ import pstats
 
 profiler=cProfile.Profile()
 with profiler:
-    for i in range(300):
+    for i in range(10):
         window.loopiter()
         window.variables["cameraPos"]+=np.array([0,0.03,0])
 
 pstats.Stats(profiler).strip_dirs().sort_stats("tottime").print_stats(10)
+
 window.loop()

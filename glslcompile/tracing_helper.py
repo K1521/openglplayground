@@ -82,7 +82,7 @@ class ShaderVariables:
             if variable.lastupdate >= self.lastupload:
                 anychanged=True
                 location = glGetUniformLocation(self.shader, key)
-                print(key,location)
+                #print(key,location)
                 value = variable.value
                 vtype = variable.vartype
 
