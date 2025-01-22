@@ -114,6 +114,13 @@ class TraceBasis:
         self.poly_basis_vec = np.array([PolyTrace({b: 1}) for b in self.poly_basis_monoms])
         self.poly_basis_index = {b: i for i, b in enumerate(self.poly_basis_monoms)}
         self.point_mat = self._compute_point_matrix()
+    
+    def polypowmat(self):
+        array=np.zeros((len(self.poly_basis_monoms),3))
+        for i,m in enumerate(self.poly_basis_monoms):
+            array[i]=m.powers
+        return array
+        
 
     def _compute_poly_basis_monoms(self,include_subpolys=True):
         poly_basis_monoms = set()

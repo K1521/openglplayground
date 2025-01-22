@@ -18,6 +18,7 @@ tracer=TraceBasis(dcga.point)
 def funtoviz(point):
     obj=dcga.toroid(2,0.5)
     #obj=dcga.Plane(1,1,1,0.01)
+    obj=dcga.Plane(1,1,1,0.01).outer(dcga.toroid(2,0.5))
     #obj=dcga.Plane(1,1,1,0.01).inner(dcga.toroid(2,0.5))
 
     #obj=sanwich(t,obj)
@@ -34,7 +35,7 @@ print(funmat)
 #print(tracer.poly_basis_monoms)
 #scene=opgraphtofuncasadi.generate_glsl_code(funtovisualize)
 prog=glslprog.glslprogramm(version="440")
-prog.parts.append(glslprog.glslprogrammpart(bodypath="./glslmatrixeval/fragmentshader8_gaussnewton.glsl"))
+prog.parts.append(glslprog.glslprogrammpart(bodypath="./glslmatrixeval/fragmentshader9_summofsquares.glsl"))
 prog.parts.append(glslprog.glslprogrammpart(header=f"""
 const int polybasislength={len(tracer.poly_basis_monoms)};
 const ivec3[polybasislength] polybasis={{{f",".join(f"{{{monom.x},{monom.y},{monom.z}}}"for monom in tracer.poly_basis_monoms)}}};
@@ -62,6 +63,7 @@ class updatemat:
         self.lastupdate=-1
         #self.tracer=tracer
         self.m1=funmat@tracer.point_mat
+        self.mat=None
 
     def __call__(self):
         campos=window.variables.variables["cameraPos"]
@@ -69,10 +71,12 @@ class updatemat:
         update=max(campos.lastupdate,c2w.lastupdate)
         if update!=self.lastupdate:
             self.lastupdate=update  
-            mat=(self.m1@tracer.transform_basis(c2w.value,campos.value))
+            self.mat=(self.m1@tracer.transform_basis(c2w.value,campos.value))
             #mat=(self.m1@tracer.move_basis(*(campos.value)))
-            window.variables["coefficientsxyz[0][0]"]=mat
-window.loopcallbacks.append(updatemat())
+            window.variables["coefficientsxyz[0][0]"]=self.mat
+
+matupdater=updatemat()
+window.loopcallbacks.append(matupdater)
 
 
 
@@ -88,5 +92,9 @@ with profiler:
         window.variables["cameraPos"]+=np.array([0,0.03,0])
 
 pstats.Stats(profiler).strip_dirs().sort_stats("tottime").print_stats(10)
+
+
+
+polypowmat=tracer.polypowmat()
 
 window.loop()

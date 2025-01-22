@@ -336,14 +336,19 @@ float gaussneewton(inout vec3 pos){
         for(int j=0;j<polybasislength;j++){
             s+=m[j]*coefficientsxyz[i][j];
         }
-        x +=s.z*s.z;
+        xx+=s.x*s.x;
+        xy+=s.x*s.y;
+        xz+=s.x*s.z;
+        yy+=s.y*s.y;
+        yz+=s.y*s.z;
+        zz+=s.z*s.z;
         JTf+=s.w*s.xyz;
         w+=s.w*s.w;
     }
 
     mat3 JTJ=mat3(xx,xy,xz,xy,yy,yz,xz,yz,zz);
 
-    //JTJ+=mat3(1,0,0,0,1,0,0,0,1)*1E-5;
+    JTJ+=mat3(1,0,0,0,1,0,0,0,1)*1E-5;
 
     pos-=inverse(JTJ)*JTf;
     return sqrt(w);
@@ -389,15 +394,17 @@ float raymarch3(vec3 rayDir, inout vec3 rayOrigin) {
             x=xguess;
         }*/
 
-        vec3 pos=vec3(0);//rayDir * roots[i].x;
+        vec3 pos=rayDir * roots[i].x;
         vec3 posinitial=pos;
-        for(int j=0;j<10;j++){
-            gaussneewton(pos);
+        /*for(int j=0;j<10;j++){
+            //gaussneewton(pos);
             vec3 pos=dot(rayDir,pos)*rayDir;
-        }
-        float e=gaussneewton(pos);
+        }*/
+        /*for(int j=0;j<2;j++)*/gaussneewton(pos);
+        float e=length(posinitial/posinitial.z-pos/pos.z);
+        //float e=0;
         float xguess=dot(rayDir,pos);
-        if(x>xguess && xguess>0){
+        if(x>xguess && xguess>0 && e<2/windowsize.x){
             error=e;
             x=xguess;
         }
@@ -567,6 +574,7 @@ void main() {
     // Checkerboard pattern
     float checker = 0.3 + 0.7 * mod(sum(floor(p * 4.0)), 2.0); // Alternates between 0.5 and 1.0
     //float checker = 0.3 + 0.7 * mod(sum(floor(p/(length(p-rayOrigin)/100+1) * 4.0)), 2.0);
+    checker=(abs(mod(p.x,0.3))<0.03 || abs(mod(p.y,0.3))<0.03 || abs(mod(p.z,0.3))<0.03) ?1.0:0.3;
     
     vec3 col=vec3(checker);
     //col=vec3(1);

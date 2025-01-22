@@ -1,12 +1,3 @@
-#version 440
-/*source=part1*/
-
-const int polybasislength=35;
-const ivec3[polybasislength] polybasis={{0,0,0},{1,0,0},{0,1,0},{0,0,1},{2,0,0},{1,1,0},{1,0,1},{0,2,0},{0,1,1},{0,0,2},{3,0,0},{2,1,0},{2,0,1},{1,2,0},{1,1,1},{1,0,2},{0,3,0},{0,2,1},{0,1,2},{0,0,3},{4,0,0},{3,1,0},{3,0,1},{2,2,0},{2,1,1},{2,0,2},{1,3,0},{1,2,1},{1,1,2},{1,0,3},{0,4,0},{0,3,1},{0,2,2},{0,1,3},{0,0,4}};
-const int numpolys=25;
-const int MAXPOLYDEGREE=4;
-
-/*source=part0*/
 //const int polybasislength=...;
 //const ivec3[polybasislength] polybasis=...;
 //const int numpolys=...;
