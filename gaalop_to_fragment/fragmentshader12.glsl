@@ -1,11 +1,3 @@
-#version 440
-/*source=part1*/
-
-const int polybasislength=15;
-const int numpolys=5;
-//const int MAXPOLYDEGREE=4;
-
-/*source=part0*/
 //const int polybasislength=...;
 //const ivec3[polybasislength] polybasis=...;
 //const int numpolys=...;

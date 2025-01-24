@@ -5,7 +5,7 @@
 #line 5 1 //code before this is defined in other file
 uniform float[numpolys][polybasislength] coefficientsxyz;
 
-//i was trying out intervall arethmetic
+//this shader uses Halley's Method from https://www.shadertoy.com/view/DlfXzB
 
 //in vec2 fragUV;
 out vec4 color;
@@ -73,7 +73,24 @@ Dual dSqr(Dual a){
     return Dual(a[0]*a[0],2*a[0]*a[1],2*(a[2]*a[0]+a[1]*a[1]));
 }
 
+Dual dSqrt(Dual a){
+    float sqrtf=sqrt(a[0]);
+    return Dual(sqrtf,a[1]/(2.*sqrtf),(2*a[0]*a[2]-a[1]*a[1])/(4*pow(a[0],1.5)));
+}
 
+Dual dAbs(Dual a) {
+    // Compute the primal part: absolute value of a[0]
+    float absf = abs(a[0]);
+
+    // Compute the first derivative: sign(a[0]) * a[1]
+    float d1 = (a[0] >= 0) ? a[1] : -a[1];
+
+    // Compute the second derivative: sign(a[0]) * a[2]
+    float d2 = (a[0] >= 0) ? a[2] : -a[2];
+
+    // Return the dual number with the primal part and derivatives
+    return Dual(absf, d1, d2);
+}
 
 
 Dual summofsquares(vec3 rayDir, vec3 rayOrigin){
@@ -124,7 +141,7 @@ Dual summofsquares(vec3 rayDir, vec3 rayOrigin){
             coefficientsxyz[i][14]*rprp
             );
     }
-    return sum;
+    return sum;// dSqrt(sum);
 
 
     //[x**2, x*y, x*z, rm*x, rp*x, y**2, y*z, rm*y, rp*y, z**2, rm*z, rp*z, rm**2, rm*rp, rp**2]

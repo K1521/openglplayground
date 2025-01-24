@@ -1,11 +1,3 @@
-#version 440
-/*source=part1*/
-
-const int polybasislength=15;
-const int numpolys=5;
-//const int MAXPOLYDEGREE=4;
-
-/*source=part0*/
 //const int polybasislength=...;
 //const ivec3[polybasislength] polybasis=...;
 //const int numpolys=...;
@@ -81,15 +73,6 @@ Dual dSqr(Dual a){
     return Dual(2*a.w*a.xyz,a.w*a.w);
 }
 
-Dual dSqrt(Dual a){
-    float sqrtf=sqrt(a.w);
-    return Dual(a.xyz/(2.*sqrtf),sqrtf);
-}
-
-Dual dAbs(Dual a) {
-    return Dual(a.xyz*sign(a.w),abs(a.w));
-}
-
 
 
 Dual summofsquares(vec3 rayDir, vec3 rayOrigin){
@@ -153,16 +136,15 @@ Dual summofsquares(vec3 rayDir, vec3 rayOrigin){
 float raymarch(vec3 rayDir, inout vec3 rayOrigin) {
     
     float bestx=0;
-    float beste=inf;
+    float bestf=inf;
     float x=0;
 
     for(int i = 0; i < 60; ++i){
 
         Dual res = summofsquares(rayDir,rayOrigin+rayDir*x);
         float f=abs(res.w);
-        float e=f;///sqrt(x+1);
-        if(e < beste){
-            beste=e;
+        if(f < bestf){
+            bestf=f;
             bestx=x;
         }
 
@@ -180,9 +162,8 @@ float raymarch(vec3 rayDir, inout vec3 rayOrigin) {
     /*for(int i=0;i<4;i++){
         Dual res = summofsquares(rayDir,rayOrigin+rayDir*x);
         float f=abs(res.w);
-        float e=f/(x+1);
-        if(e < beste && x>0){
-            beste=e;
+        if(f < bestf && x>0){
+            bestf=f;
             bestx=x;
         }
 
@@ -197,7 +178,7 @@ float raymarch(vec3 rayDir, inout vec3 rayOrigin) {
     }*/
 
     rayOrigin += rayDir * bestx;
-    return beste;
+    return bestf;
 }
 
 
