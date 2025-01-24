@@ -246,6 +246,7 @@ if __name__=="__main__":
     print(tracer.transform_basis(rotation_matrix,np.array([1,2,3])))
     print()
 
-    # print(funmat)
+    print(funmat)
+    print(funmat.shape)
     # print(tracer.point_mat)
     # print(str((funmat@tracer.point_mat@shiftmat@tracer.poly_basis_vec)[0]).replace("**","^"))

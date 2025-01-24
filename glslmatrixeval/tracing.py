@@ -85,6 +85,6 @@ with profiler:
         window.loopiter()
         window.variables["cameraPos"]+=np.array([0,0.03,0])
 
-pstats.Stats(#profiler).strip_dirs().sort_stats("tottime").print_stats(10)
+pstats.Stats(profiler).strip_dirs().sort_stats("tottime").print_stats(10)
 window.loop()
 pstats.Stats(profiler).strip_dirs().sort_stats("tottime").print_stats(7)
