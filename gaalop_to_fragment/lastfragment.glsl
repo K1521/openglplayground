@@ -94,8 +94,8 @@ Dual summofsquares(vec3 rayDir, vec3 rayOrigin){
     Dual zz=dSqr(z);
 
     Dual r=xx+yy+zz;
-    Dual rp=r+Dual(1.,0.,0.);
-    Dual rm=r-Dual(1.,0.,0.);
+    Dual rp=(r+Dual(1.,0.,0.))*0.5;
+    Dual rm=(r-Dual(1.,0.,0.))*0.5;
 
     Dual xy=dMul(x,y);
     Dual yz=dMul(y,z);
@@ -158,10 +158,26 @@ float raymarch(vec3 rayDir, inout vec3 rayOrigin) {
         }
 
         // Newton: x = x - f(x) / f'(x)
-        //t += min(.25, abs((res.f) / (res.d.x)));
+        //x += min(4, abs(res[0] / res[1]));
 
         // Halley: x = x - 2f(x)f'(x) / (2(f'(x)²) - f(x)f''(x))
-        x += min(.25, abs(2. * res[0] * res[1] / (2. * res[1] * res[1] - res[0] * res[2])));
+        x += min(4, abs(2. * res[0] * res[1] / (2. * res[1] * res[1] - res[0] * res[2])));
+
+    }
+    x=bestx;
+    for(int i=0;i<4;i++){
+        Dual res = summofsquares(rayDir,rayOrigin+rayDir*x);
+        float f=abs(res[0]);
+        if(f < bestf && x>0){
+            bestf=f;
+            bestx=x;
+        }
+
+        // Newton: x = x - f(x) / f'(x)
+        //x += min(4, abs(res[0] / res[1]));
+
+        // Halley: x = x - 2f(x)f'(x) / (2(f'(x)²) - f(x)f''(x))
+        x += -2. * res[0] * res[1] / (2. * res[1] * res[1] - res[0] * res[2]);
 
     }
 
@@ -175,15 +191,15 @@ float raymarch(vec3 rayDir, inout vec3 rayOrigin) {
 void main() {
     vec2 uv=(2*gl_FragCoord.xy-windowsize)/windowsize.x;
     vec3 rayOrigin = cameraPos;
-    vec3 rayDir =normalize(vec3(uv, FOVfactor));//cam to view
+    vec3 rayDir =cameraMatrix*normalize(vec3(uv, FOVfactor));//cam to view
    
 
     // Sphere tracing
 
-    vec3 p=vec3(0);//rayOrigin;
+    vec3 p=rayOrigin;//vec3(0);//rayOrigin;
     float dist=raymarch(rayDir,p);
     //float dist=raymarch4(rayDir,p);
-    p=(cameraMatrix)*p+rayOrigin;
+    //p=(cameraMatrix)*p+rayOrigin;
 
 
         
