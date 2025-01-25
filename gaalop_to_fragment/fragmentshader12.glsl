@@ -169,10 +169,10 @@ float raymarch(vec3 rayDir, inout vec3 rayOrigin) {
 
     }
     x=bestx;
-    /*for(int i=0;i<4;i++){
+    /*for(int i=0;i<10;i++){
         Dual res = summofsquares(rayDir,rayOrigin+rayDir*x);
-        float f=abs(res.w);
-        float e=f/(x+1);
+        float f=res.w;
+        float e=abs(f)/(x+1);
         if(e < beste && x>0){
             beste=e;
             bestx=x;
@@ -184,7 +184,8 @@ float raymarch(vec3 rayDir, inout vec3 rayOrigin) {
         // Halley: x = x - 2f(x)f'(x) / (2(f'(x)²) - f(x)f''(x))
         //x += -2. * res[0] * res[1] / (2. * res[1] * res[1] - res[0] * res[2]);
 
-        x += min(4, (f / length(res.xyz))*sign(dot(res.xyz,rayDir)));
+        //x += min(4, (f / length(res.xyz))*sign(dot(res.xyz,rayDir)));
+        x -= res.w / dot(res.xyz,rayDir);
 
     }*/
 
