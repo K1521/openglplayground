@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebGL Triangle</title>
+  <style>
+    canvas { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <canvas id="myCanvas"></canvas>
+  <script>
+    const canvas = document.getElementById('myCanvas');
+    const gl = canvas.getContext('webgl2');
+    //console.log(gl);
+    if (!gl) {
+      alert("WebGL not supported!");
+    }
+
+    const vertexShaderSource = `#version 300 es
+      in vec4 a_position;
+      void main(void) {
+        gl_Position = a_position;
+      }
+    `;
+
+    const fragmentShaderSource = `#version 300 es
+      precision mediump float;
+
+      const float FOV=120.;
+      const float FOVfactor=1.0/tan(radians(FOV) * 0.5);
+
+      out vec4 color;
+
+      uniform vec3 cameraPos;
+      uniform vec2 windowsize;
+      uniform mat3 c2w;
+
+      float sum(vec3 v) {
+        return v.x+v.y+v.z;
+      }
+      int sum(ivec3 v) {
+        return v.x+v.y+v.z;
+      }
+
+      //simple sphere tracer to test controlls
+      float scene(vec3 p){
+        return min(
+        length(p-vec3(1.,2.,4.))-1.,
+        length(p-vec3(-1.,2.,5.))-2.
+        );
+      }
+
+      float raymarch(inout vec3 p,vec3 raydir){
+        float x=0.0;
+        //float xbest=0.0;
+        //float ebest=inf;
+
+
+        for(int i=0;i<20;i++){
+          float e=scene(p+x*raydir);
+          
+          x+=e;
+        }
+        p+=x*raydir;
+        return 0.;
+
+      }
+
+
+      void main(void) {
+        vec2 uv=(2.0*gl_FragCoord.xy-windowsize)/windowsize.x;
+        vec3 rayOrigin = cameraPos;
+        vec3 rayDir =c2w*normalize(vec3(uv, FOVfactor));//cam to view
+
+        vec3 p=rayOrigin;
+        raymarch(p,rayDir);
+
+        float checker = 0.3 + 0.7 * mod(sum(floor(p * 4.0)), 2.0);
+
+
+
+        color = checker*vec4(1.0, 0.0, 0.0, 1.0);  // Red color
+      }
+    `;
+    console.log(fragmentShaderSource);
+
+    function compileShader(gl, source, type) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error("Shader compile failed:", gl.getShaderInfoLog(shader));
+      }
+      return shader;
+    }
+
+    function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+      const vertexShader = compileShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
+      const fragmentShader = compileShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
+      const program = gl.createProgram();
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error("Program link failed:", gl.getProgramInfoLog(program));
+      }
+      return program;
+    }
+
+    const shaderProgram = createProgram(gl, vertexShaderSource, fragmentShaderSource);
+    gl.useProgram(shaderProgram);
+
+    //draw rect
+
+    const vertices = new Float32Array([
+      -1, 1,
+      -1,-1,
+       1, 1,
+       1,-1
+    ]);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+    const positionAttribLocation = gl.getAttribLocation(shaderProgram, "a_position");
+    gl.vertexAttribPointer(positionAttribLocation, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(positionAttribLocation);
+
+    
+
+
+    
+    
+    
+
+    const cameraPosLocation = gl.getUniformLocation(shaderProgram, 'cameraPos');
+    const cameraPos = [0.0, 0.0, 0.0];
+    gl.uniform3fv(cameraPosLocation, cameraPos);
+
+    const windowsizeLocation = gl.getUniformLocation(shaderProgram, 'windowsize');
+    const windowsize = [canvas.width, canvas.height];
+    gl.uniform2fv(windowsizeLocation, windowsize);
+
+    const c2wLocation = gl.getUniformLocation(shaderProgram, 'c2w');
+    const c2w = new Float32Array([
+      1.0, 0.0, 0.0,
+      0.0, 1.0, 0.0,
+      0.0, 0.0, 1.0
+    ]);
+    gl.uniformMatrix3fv(c2wLocation, false, c2w);
+
+
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+  </script>
+</body>
+</html>

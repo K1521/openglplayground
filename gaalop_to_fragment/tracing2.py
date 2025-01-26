@@ -62,8 +62,8 @@ def remove_rows_by_rankQR(matrix):
 
 def funtoviz(point):
     obj=dcga.toroid(2,0.5)
-    #obj=dcga.Plane(1,1,1,0.01)
-    obj=dcga.Plane(1,3,2,0.5).outer(dcga.toroid(2,0.5))
+    obj=dcga.Plane(1,1,1,0.01)
+    #obj=dcga.Plane(1,3,2,0.5).outer(dcga.toroid(2,0.5))
     #obj=dcga.Plane(1,1,1,0.01).inner(dcga.toroid(2,0.5))
 
     #obj=sanwich(t,obj)
