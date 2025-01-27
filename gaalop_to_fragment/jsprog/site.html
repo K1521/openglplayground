@@ -66,6 +66,11 @@
     
     function radians(x){return x*Math.PI/180;}
 
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+
 
     async function main(){
       const fragmentShaderSource =await loadShader("./fragmentshader.glsl"); 
@@ -100,21 +105,63 @@
       gl.uniform2fv(windowsizeLocation, windowsize);
 
       let c2w=Matrix.eye(3);
-      const rotr1=Matrix.rotationMatrix(new Vector([0,1,0]),radians(1));
+      //const rotr1=Matrix.rotationMatrix(new Vector([0,1,0]),radians(1));
+
+      let canvasupdate=true;
+
+      let mouse = {
+        x: 0,    // Mouse X position
+        y: 0,    // Mouse Y position
+        left: false,  // Left button state (true = pressed, false = released)
+        right: false, // Right button state (true = pressed, false = released)
+        middle: false // Middle button state (true = pressed, false = released)
+      };
+
+      // Update mouse position and button state on mouse events
+      canvas.addEventListener('mousemove', (event) => {
+          // Update mouse coordinates
+          const dx=event.clientX-mouse.x;
+          const dy=event.clientY-mouse.y;
+          mouse.x = event.clientX;
+          mouse.y = event.clientY;
+          if(mouse.left){
+            c2w=Matrix.rotationMatrix(new Vector([0,1,0]),radians(dx)).mul(
+                Matrix.rotationMatrix(new Vector([1,0,0]),radians(dy))).mul(
+                c2w);
+            canvasupdate=true;
+          }
+      });
+
+      canvas.addEventListener('mousedown', (event) => {
+          // Update mouse button states
+          if (event.button === 0) mouse.left = true;    // Left button
+          if (event.button === 1) mouse.middle = true;  // Middle button
+          if (event.button === 2) mouse.right = true;   // Right button
+      });
+
+      canvas.addEventListener('mouseup', (event) => {
+          // Update mouse button states
+          if (event.button === 0) mouse.left = false;
+          if (event.button === 1) mouse.middle = false;
+          if (event.button === 2) mouse.right = false;
+      });
+
 
       function animate(){
-        c2w=c2w.mul(rotr1).orthogonalize();//orthogonalize only against precision errors. probably unnessesary
+        //c2w=c2w.mul(rotr1).orthogonalize();//orthogonalize only against precision errors. probably unnessesary
 
        
+        if(canvasupdate){
+          const c2wLocation = gl.getUniformLocation(shaderProgram, 'c2w');
+          gl.uniformMatrix3fv(c2wLocation, false, new Float32Array(c2w.array.flat()));
 
-        const c2wLocation = gl.getUniformLocation(shaderProgram, 'c2w');
-        gl.uniformMatrix3fv(c2wLocation, false, new Float32Array(c2w.array.flat()));
-
-        gl.clearColor(0.0, 0.0, 0.0, 1.0);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        //await sleep(1000);
+          gl.clearColor(0.0, 0.0, 0.0, 1.0);
+          gl.clear(gl.COLOR_BUFFER_BIT);
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+          canvasupdate=false;
+        }
         requestAnimationFrame(animate);
+        
       }
       requestAnimationFrame(animate);
     }
