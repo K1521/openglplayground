@@ -20,6 +20,9 @@ class Vector {
             throw new TypeError("Vectors must be of the same size for this operation");
         }
     }
+    x(){return this.array[0];}
+    y(){return this.array[1];}
+    z(){return this.array[2];}
 
     // Vector addition
     add(B) {
