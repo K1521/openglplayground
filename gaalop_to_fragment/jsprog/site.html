@@ -5,14 +5,39 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Geometric Algebra</title>
   <style>
-    canvas { width: 100%; height: 100%; }
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #fpsCounter {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-size: 20px;
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 5px;
+      border-radius: 5px;
+    }
   </style>
 </head>
 <body>
   <canvas id="myCanvas"></canvas>
-  <script  type="module">
+  <div id="fpsCounter">FPS: 0</div>
+
+  <script type="module">
 import { Vector, Matrix } from './linalg1.js';
 
+const fpscounter=document.getElementById('fpsCounter')
 const canvas = document.getElementById('myCanvas');
 const gl = canvas.getContext('webgl2');
 //console.log(gl);
@@ -119,11 +144,11 @@ async function main(){
   let canvasupdate=true;
 
   let mouse = {
-    x: undefined,    // Mouse X position
-    y: undefined,    // Mouse Y position
-    left: false,  // Left button state (true = pressed, false = released)
-    right: false, // Right button state (true = pressed, false = released)
-    middle: false // Middle button state (true = pressed, false = released)
+    x: undefined,
+    y: undefined,
+    left: false,  
+    right: false, 
+    middle: false
   };
 
   // Update mouse position and button state on mouse events
@@ -222,10 +247,14 @@ async function main(){
     }
   });
 
+  
+  let deltatimeavg=0
   let lastTime = 0;
   function animate(timestamp){
     let deltatime = (timestamp - lastTime) / 1000; // Convert to seconds
     lastTime = timestamp;
+    deltatimeavg=deltatimeavg*0.95+deltatime*0.05;
+    fpscounter.innerText = `FPS: ${Math.ceil(1/deltatimeavg)}`;
 
     //c2w=c2w.mul(rotr1).orthogonalize();//orthogonalize only against precision errors. probably unnessesary
     let movementfactor=deltatime*4;
