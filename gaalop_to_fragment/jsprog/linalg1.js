@@ -132,7 +132,7 @@ class Matrix {
     #vecmul(B){
         if(this.size()[1]!==B.size())
             throw new Error("Matrix dimensions do not allow matrix vector multiplication");
-        Barr=B.array;
+        const Barr=B.array;
         return new Vector(
             this.array.map(row => 
                 row.reduce((sum, val, idx) => 
@@ -275,5 +275,21 @@ class Matrix {
         const orthogonalMatrix = new Matrix([x_new.array, y_new.array, z_new.array]);
 
         return orthogonalMatrix;
+    }
+
+    transpose() {
+      
+        const arr=this.array;  
+        const [rows,cols] = this.size();
+        const transposed = [];
+      
+        for (let i = 0; i < cols; i++) {
+          transposed[i] = [];
+          for (let j = 0; j < rows; j++) {
+            transposed[i][j] = arr[j][i];
+          }
+        }
+      
+        return new Matrix(transposed);
     }
 }

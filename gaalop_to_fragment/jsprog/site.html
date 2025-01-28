@@ -97,8 +97,8 @@ async function main(){
 
 
   const cameraPosLocation = gl.getUniformLocation(shaderProgram, 'cameraPos');
-  const cameraPos = [0.0, 0.0, 0.0];
-  gl.uniform3fv(cameraPosLocation, cameraPos);
+  let cameraPos = new Vector([0,0,0]);
+  gl.uniform3fv(cameraPosLocation, cameraPos.array);
 
   const windowsizeLocation = gl.getUniformLocation(shaderProgram, 'windowsize');
   const windowsize = [canvas.width, canvas.height];
@@ -110,20 +110,24 @@ async function main(){
   let canvasupdate=true;
 
   let mouse = {
-    x: 0,    // Mouse X position
-    y: 0,    // Mouse Y position
+    x: undefined,    // Mouse X position
+    y: undefined,    // Mouse Y position
     left: false,  // Left button state (true = pressed, false = released)
     right: false, // Right button state (true = pressed, false = released)
     middle: false // Middle button state (true = pressed, false = released)
   };
 
   // Update mouse position and button state on mouse events
-  canvas.addEventListener('mousemove', (event) => {
+  window.addEventListener('mousemove', (event) => {
     const rect = canvas.getBoundingClientRect();
     const xcord=event.clientX - rect.left;
     const ycord=event.clientY - rect.top;
     //const dx=xcord-mouse.x;
     //const dy=event.clientY-mouse.y;
+    if(mouse.x===undefined){
+      mouse.x=xcord;
+      mouse.y=ycord;
+    }
 
     if(mouse.left){
       
@@ -131,7 +135,7 @@ async function main(){
       const deltay=rect.bottom-rect.top;
       const fovfactor=1/Math.tan(radians(120)/2);
       
-      const u= c=>(2.0*c-deltax)/deltax;
+      const u= c=>(2.0*c-deltax)/deltax;//cords between [-1,1]
       const v= c=>(2.0*c-deltay)/deltax;
       const uangle=(Math.atan(u(xcord)/fovfactor)-Math.atan(u(mouse.x)/fovfactor));
       const vangle=(Math.atan(v(ycord)/fovfactor)-Math.atan(v(mouse.y)/fovfactor));
@@ -157,7 +161,7 @@ async function main(){
     if (event.button === 2) mouse.right = true;   // Right button
   });
 
-  canvas.addEventListener('mouseup', (event) => {
+  window.addEventListener('mouseup', (event) => {
     // Update mouse button states
     if (event.button === 0) mouse.left = false;
     if (event.button === 1) mouse.middle = false;
@@ -165,8 +169,71 @@ async function main(){
   });
 
 
-  function animate(){
+  const keysPressed = {
+    w: false,
+    a: false,
+    s: false,
+    d: false,
+    shift: false,
+    space: false
+  };
+
+  // Handle keydown event
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'w' || event.key === 'W') {
+      keysPressed.w = true;
+    } else if (event.key === 'a' || event.key === 'A') {
+      keysPressed.a = true;
+    } else if (event.key === 's' || event.key === 'S') {
+      keysPressed.s = true;
+    } else if (event.key === 'd' || event.key === 'D') {
+      keysPressed.d = true;
+    } else if (event.key === 'Shift') {
+      keysPressed.shift = true;
+    } else if (event.key === ' ') {  // Space key
+      keysPressed.space = true;
+    }
+    
+  });
+
+  // Handle keyup event
+  window.addEventListener('keyup', (event) => {
+    if (event.key === 'w' || event.key === 'W') {
+      keysPressed.w = false;
+    } else if (event.key === 'a' || event.key === 'A') {
+      keysPressed.a = false;
+    } else if (event.key === 's' || event.key === 'S') {
+      keysPressed.s = false;
+    } else if (event.key === 'd' || event.key === 'D') {
+      keysPressed.d = false;
+    } else if (event.key === 'Shift') {
+      keysPressed.shift = false;
+    } else if (event.key === ' ') {  // Space key
+      keysPressed.space = false;
+    }
+  });
+
+  let lastTime = 0;
+  function animate(timestamp){
+    let deltatime = (timestamp - lastTime) / 1000; // Convert to seconds
+    lastTime = timestamp;
+
     //c2w=c2w.mul(rotr1).orthogonalize();//orthogonalize only against precision errors. probably unnessesary
+    let movementfactor=deltatime*4;
+    let deltapos=new Vector([0,0,0]);
+    if(keysPressed.shift)movementfactor/=10;
+    if(keysPressed.space)movementfactor*=5;
+    if(keysPressed.a)deltapos=deltapos.add(new Vector([-1,0,0]));
+    if(keysPressed.d)deltapos=deltapos.add(new Vector([1,0,0]));
+    if(keysPressed.s)deltapos=deltapos.add(new Vector([0,0,-1]));
+    if(keysPressed.w)deltapos=deltapos.add(new Vector([0,0,1]));
+    deltapos=deltapos.mul(movementfactor);
+    if(deltapos.abs()>0){
+      canvasupdate=true;
+      cameraPos = cameraPos.add(c2w.transpose().mul(deltapos));
+      gl.uniform3fv(cameraPosLocation, cameraPos.array);
+
+    }
 
     
     if(canvasupdate){
@@ -177,6 +244,7 @@ async function main(){
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       canvasupdate=false;
+      
     }
     requestAnimationFrame(animate);
     
