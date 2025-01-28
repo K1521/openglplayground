@@ -26,18 +26,18 @@ float scene(vec3 p){
 }
 
 float raymarch(inout vec3 p,vec3 raydir){
-float x=0.0;
-//float xbest=0.0;
-//float ebest=inf;
+    float x=0.0;
+    //float xbest=0.0;
+    //float ebest=inf;
 
 
-for(int i=0;i<20;i++){
-    float e=scene(p+x*raydir);
-    
-    x+=e;
-}
-p+=x*raydir;
-return 0.;
+    for(int i=0;i<20;i++){
+        float e=scene(p+x*raydir);
+        
+        x+=e;
+    }
+    p+=x*raydir;
+    return 0.;
 
 }
 

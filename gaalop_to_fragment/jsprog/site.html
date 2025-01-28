@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebGL Triangle</title>
+  <title>Geometric Algebra</title>
   <style>
     canvas { width: 100%; height: 100%; }
   </style>
@@ -73,10 +73,19 @@ function sleep(ms) {
 
 
 async function main(){
-  const fragmentShaderSource =await loadShader("./fragmentshader.glsl"); 
+  const fragmentShaderSource =await loadShader("./frag2.glsl"); 
+  //console.log(fragmentShaderSource);
 
   const shaderProgram = createProgram(gl, vertexShaderSource,fragmentShaderSource );
   gl.useProgram(shaderProgram);
+  
+  let funmat=new Matrix([[-3.2,0., 0., 0., 0.,-3.2,0., 0., 0., 0., 0., 0., 1.5125, -5.225,   4.5125]]);
+  for(let i=0;i<funmat.size()[0];i++)
+    for(let j=0;j<funmat.size()[1];j++){
+      let location = gl.getUniformLocation(shaderProgram,`coefficientsxyz[${i*15+j}]`);
+      console.log(location);
+      gl.uniform1f(location, funmat.array[i][j]);
+    }
 
   //draw rect
 
@@ -237,7 +246,7 @@ async function main(){
 
     
     if(canvasupdate){
-      const c2wLocation = gl.getUniformLocation(shaderProgram, 'c2w');
+      const c2wLocation = gl.getUniformLocation(shaderProgram, "cameraMatrix");
       gl.uniformMatrix3fv(c2wLocation, false, new Float32Array(c2w.array.flat()));
 
       gl.clearColor(0.0, 0.0, 0.0, 1.0);
