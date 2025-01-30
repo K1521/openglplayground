@@ -278,8 +278,8 @@ async function main(){
       const c2wLocation = gl.getUniformLocation(shaderProgram, "cameraMatrix");
       gl.uniformMatrix3fv(c2wLocation, false, new Float32Array(c2w.array.flat()));
 
-      gl.clearColor(0.0, 0.0, 0.0, 1.0);
-      gl.clear(gl.COLOR_BUFFER_BIT);
+      //gl.clearColor(0.0, 0.0, 0.0, 1.0);
+      //gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       canvasupdate=false;
       
