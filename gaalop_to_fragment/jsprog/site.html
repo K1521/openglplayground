@@ -176,29 +176,62 @@ async function load(url) {
 
 //console.log(fragmentShaderSource);
 
-function compileShader(gl, source, type) {
-  const shader = gl.createShader(type);
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    console.error("Shader compile failed:", gl.getShaderInfoLog(shader));
-    alert(gl.getShaderInfoLog(shader));
+class Shader{
+  constructor(gl,vertexShaderSource,fragmentShaderSource){
+    this.programm=Shader.createProgram(gl, vertexShaderSource,fragmentShaderSource );
+    this.gl=gl;
+    this.attributelocations=new Map();
+    this.uniformlocations=new Map();
   }
-  return shader;
+
+  use(){
+    this.gl.useProgram(this.programm);
+  }
+
+  getUniformLocation(name){
+    var loc=this.uniformlocations.get(name);
+    if(loc==undefined){
+      loc=this.gl.getUniformLocation(this.programm,name);
+      this.uniformlocations.set(name,loc);
+    }
+    return loc;
+  }
+  getAttribLocation(name){
+    var loc=this.attributelocations.get(name);
+    if(loc==undefined){
+      loc=this.gl.getAttribLocation(this.programm,name);
+      this.attributelocations.set(name,loc);
+    }
+    return loc;
+  }
+  
+
+  static compileShader(gl, source, type) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      console.error("Shader compile failed:", gl.getShaderInfoLog(shader));
+      alert(gl.getShaderInfoLog(shader));
+    }
+    return shader;
+  }
+
+  static createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+    const vertexShader = Shader.compileShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
+    const fragmentShader = Shader.compileShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error("Program link failed:", gl.getProgramInfoLog(program));
+    }
+    return program;
+  }
 }
 
-function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
-  const vertexShader = compileShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
-  const fragmentShader = compileShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
-  const program = gl.createProgram();
-  gl.attachShader(program, vertexShader);
-  gl.attachShader(program, fragmentShader);
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.error("Program link failed:", gl.getProgramInfoLog(program));
-  }
-  return program;
-}
+
 
 function radians(x){return x*Math.PI/180;}
 
@@ -212,14 +245,13 @@ async function main(){
   const fragmentShaderSource =await load("./frag3.glsl"); 
   //console.log(fragmentShaderSource);
 
-  const shaderProgram = createProgram(gl, vertexShaderSource,fragmentShaderSource );
-  gl.useProgram(shaderProgram);
+  const shader =new Shader(gl, vertexShaderSource,fragmentShaderSource );
+  shader.use();
   
   let funmat=new Matrix([[-3.2,0., 0., 0., 0.,-3.2,0., 0., 0., 0., 0., 0., 1.5125, -5.225,   4.5125]]);
   for(let i=0;i<funmat.size()[0];i++)
     for(let j=0;j<funmat.size()[1];j++){
-      let location = gl.getUniformLocation(shaderProgram,`coefficientsxyz[${i*15+j}]`);
-      console.log(location);
+      let location = shader.getUniformLocation(`coefficientsxyz[${i*15+j}]`);
       gl.uniform1f(location, funmat.array[i][j]);
     }
 
@@ -236,16 +268,16 @@ async function main(){
   gl.bindBuffer(gl.ARRAY_BUFFER, verticesbuffer);
   gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
-  const positionAttribLocation = gl.getAttribLocation(shaderProgram, "a_position");
+  const positionAttribLocation =shader.getAttribLocation("a_position");
   gl.vertexAttribPointer(positionAttribLocation, 2, gl.FLOAT, false, 0, 0);
   gl.enableVertexAttribArray(positionAttribLocation);
 
 
-  const cameraPosLocation = gl.getUniformLocation(shaderProgram, 'cameraPos');
+  const cameraPosLocation = shader.getUniformLocation('cameraPos');
   let cameraPos = new Vector([0,0,0]);
   gl.uniform3fv(cameraPosLocation, cameraPos.array);
 
-  const windowsizeLocation = gl.getUniformLocation(shaderProgram, 'windowsize');
+  const windowsizeLocation = shader.getUniformLocation('windowsize');
   let canvasupdate=true;
   
   function resizeCanvas() {
@@ -403,7 +435,7 @@ async function main(){
       deltatimeavg=deltatimeavg*0.95+deltatime*0.05;
       fpscounter.innerText = `FPS: ${Math.ceil(1/deltatimeavg)}`;
 
-      const c2wLocation = gl.getUniformLocation(shaderProgram, "cameraMatrix");
+      const c2wLocation = shader.getUniformLocation("cameraMatrix");
       gl.uniformMatrix3fv(c2wLocation, false, new Float32Array(c2w.array.flat()));
 
       //gl.clearColor(0.0, 0.0, 0.0, 1.0);

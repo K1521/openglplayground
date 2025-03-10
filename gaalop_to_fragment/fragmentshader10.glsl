@@ -80,16 +80,17 @@ Dual dSqrt(Dual a){
 
 Dual dAbs(Dual a) {
     // Compute the primal part: absolute value of a[0]
-    float absf = abs(a[0]);
+    //float absf = abs(a[0]);
 
     // Compute the first derivative: sign(a[0]) * a[1]
-    float d1 = (a[0] >= 0) ? a[1] : -a[1];
+    //float d1 = (a[0] >= 0) ? a[1] : -a[1];
 
     // Compute the second derivative: sign(a[0]) * a[2]
-    float d2 = (a[0] >= 0) ? a[2] : -a[2];
+    //float d2 = (a[0] >= 0) ? a[2] : -a[2];
 
     // Return the dual number with the primal part and derivatives
-    return Dual(absf, d1, d2);
+    //return Dual(absf, d1, d2);
+    return (a[0] >= 0) ? a : -a;
 }
 
 
