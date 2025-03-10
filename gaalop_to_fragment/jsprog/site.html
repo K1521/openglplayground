@@ -239,7 +239,149 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+class cameracontroll{
+  constructor(canvas){
+    this.canvas=canvas;
+    this.colorpicker=true;
+    this.c2w=Matrix.eye(3);
+    this.cameraPos = new Vector([0,0,0]);
+    this.mouse = {
+      x: undefined,
+      y: undefined,
+      left: false,  
+      right: false, 
+      middle: false
+    };
+    this.keysPressed = {
+      w: false,
+      a: false,
+      s: false,
+      d: false,
+      q: false,
+      e: false,
+      shift: false,
+      space: false
+    };
+    this.changed=true;
+    // Bind event listener functions to maintain 'this' context
+    this.mousemove = this.mousemove.bind(this);
+    this.mousedown = this.mousedown.bind(this);
+    this.mouseup = this.mouseup.bind(this);
+    this.keydown = this.keydown.bind(this);
+    this.keyup = this.keyup.bind(this);
 
+    this.initeventlisteners()
+  }
+  mousemove(event){
+    const rect = this.canvas.getBoundingClientRect();
+    const xcord=event.clientX - rect.left;
+    const ycord=event.clientY - rect.top;
+    //const dx=xcord-mouse.x;
+    //const dy=event.clientY-mouse.y;
+    if(this.mouse.x===undefined){
+      this.mouse.x=xcord;
+      this.mouse.y=ycord;
+    }
+
+    if(this.mouse.left){
+      
+      const width=rect.right-rect.left;
+      const height=rect.bottom-rect.top;
+      const fovfactor=1/Math.tan(radians(120)/2);
+      
+      const u= c=>(2.0*c-width)/width;//cords between [-1,1]
+      const v= c=>(2.0*c-height)/width;
+      const uangle=(Math.atan(u(xcord)/fovfactor)-Math.atan(u(this.mouse.x)/fovfactor));
+      const vangle=(Math.atan(v(ycord)/fovfactor)-Math.atan(v(this.mouse.y)/fovfactor));
+
+
+      this.c2w=Matrix.rotationMatrix(new Vector([0,1,0]),uangle).mul(
+          Matrix.rotationMatrix(new Vector([1,0,0]),vangle)).mul(
+          this.c2w);
+      this.changed=true;
+    }
+
+    this.mouse.x = xcord;
+    this.mouse.y = ycord;
+  }
+
+  mousedown(event){
+    // Update mouse button states
+    if (event.button === 0) this.mouse.left = true;    // Left button
+    if (event.button === 1) this.mouse.middle = true;  // Middle button
+    if (event.button === 2) this.mouse.right = true;   // Right button
+
+    if(this.colorpicker){
+      const x = event.clientX;
+      const y = this.canvas.height - event.clientY; // Flip Y since WebGL has (0,0) at bottom-left
+      const pixels = new Uint8Array(4); // RGBA
+      gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      const color = `rgb(${(pixels[0]/255).toFixed(3)}, ${(pixels[1]/255).toFixed(3)}, ${(pixels[2]/255).toFixed(3)}, ${(pixels[3]/255).toFixed(3)})    rgb(${pixels[0]}, ${pixels[1]}, ${pixels[2]}, ${pixels[3]})    (${pixels[0]-128}, ${pixels[1]-128}, ${pixels[2]-128}, ${pixels[3]-128})`;
+      console.log(color); // Display the color in console or UI
+    }
+  }
+
+  mouseup(event){
+    // Update mouse button states
+    if (event.button === 0) this.mouse.left = false;
+    if (event.button === 1) this.mouse.middle = false;
+    if (event.button === 2) this.mouse.right = false;
+  }
+
+  keydown(event){
+    if (event.key === ' ') {  // Space key
+      this.keysPressed.space = true;
+    }else{
+      this.keysPressed[event.key.toLowerCase()]=true;
+    }
+  }
+
+  keyup(event){
+    if (event.key === ' ') {  // Space key
+      this.keysPressed.space = false;
+    }else{
+      this.keysPressed[event.key.toLowerCase()]=false;
+    }
+  }
+
+  initeventlisteners(){
+    window.addEventListener('mousemove', this.mousemove);
+    this.canvas.addEventListener('mousedown', this.mousedown);//uses canvas because moving on other elements shouldnt influence the camera
+    window.addEventListener('mouseup', this.mouseup);
+    window.addEventListener('keydown',this.keydown);
+    window.addEventListener('keyup',this.keyup);
+  }
+  update(deltatime){
+    this.c2w=this.c2w.orthogonalize();//orthogonalize only against precision errors. probably unnessesary
+    let movementfactor=deltatime;
+    let deltapos=new Vector([0,0,0]);
+    if(this.keysPressed.shift)movementfactor/=10;
+    if(this.keysPressed.space)movementfactor*=5;
+    if(this.keysPressed.a)deltapos=deltapos.add(new Vector([-1,0,0]));
+    if(this.keysPressed.d)deltapos=deltapos.add(new Vector([1,0,0]));
+    if(this.keysPressed.s)deltapos=deltapos.add(new Vector([0,0,-1]));
+    if(this.keysPressed.w)deltapos=deltapos.add(new Vector([0,0,1]));
+    if(this.keysPressed.q){
+      this.c2w=Matrix.rotationMatrix(new Vector([0,1,0]),radians(movementfactor*30)).mul(this.c2w);
+      this.changed=true;
+    };
+    if(this.keysPressed.e){
+      this.c2w=Matrix.rotationMatrix(new Vector([0,1,0]),radians(-movementfactor*30)).mul(this.c2w);
+      this.changed=true;
+    };
+    deltapos=deltapos.mul(movementfactor*4);
+    if(deltapos.abs()>0){
+      this.changed=true;
+      this.cameraPos = this.cameraPos.add(this.c2w.transpose().mul(deltapos));
+    }
+  }
+  upadeuniforms(shader){
+    const cameraPosLocation = shader.getUniformLocation('cameraPos');
+    shader.gl.uniform3fv(cameraPosLocation, this.cameraPos.array);
+    const c2wLocation = shader.getUniformLocation("cameraMatrix");
+    shader.gl.uniformMatrix3fv(c2wLocation, false, new Float32Array(this.c2w.array.flat()));
+  }
+}
 
 async function main(){
   const fragmentShaderSource =await load("./frag3.glsl"); 
@@ -247,13 +389,27 @@ async function main(){
 
   const shader =new Shader(gl, vertexShaderSource,fragmentShaderSource );
   shader.use();
+  const camera=new cameracontroll(mainCanvas);
   
   let funmat=new Matrix([[-3.2,0., 0., 0., 0.,-3.2,0., 0., 0., 0., 0., 0., 1.5125, -5.225,   4.5125]]);
+  /*const ubo = gl.createBuffer();
+  gl.bindBuffer(gl.UNIFORM_BUFFER, ubo);
+  console.log(funmat.array.flat().length);
+  gl.bufferData(gl.UNIFORM_BUFFER, new Float32Array(funmat.array.flat().map(x=>[x,0,0,0]).flat()), gl.STATIC_DRAW);
+  const blockIndex = gl.getUniformBlockIndex(shader.programm, "MyUBO");
+  console.log(blockIndex);
+  // Bind the UBO to a binding point (0 in this case)
+  gl.uniformBlockBinding(shader.programm, blockIndex, 0);
+  // Bind the UBO to the uniform binding point (0)
+  gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, ubo);*/
+
+  
   for(let i=0;i<funmat.size()[0];i++)
     for(let j=0;j<funmat.size()[1];j++){
       let location = shader.getUniformLocation(`coefficientsxyz[${i*15+j}]`);
       gl.uniform1f(location, funmat.array[i][j]);
     }
+  
 
   
   //setup glsl
@@ -278,7 +434,7 @@ async function main(){
   gl.uniform3fv(cameraPosLocation, cameraPos.array);
 
   const windowsizeLocation = shader.getUniformLocation('windowsize');
-  let canvasupdate=true;
+
   
   function resizeCanvas() {
     const dpr = window.devicePixelRatio || 1;
@@ -287,114 +443,12 @@ async function main(){
     gl.viewport(0, 0, mainCanvas.width, mainCanvas.height);
     const windowsize = [mainCanvas.width, mainCanvas.height];
     gl.uniform2fv(windowsizeLocation, windowsize);
-    canvasupdate=true;
+    camera.changed=true;
   }
   window.addEventListener("resize", resizeCanvas);
   resizeCanvas();
 
-  let c2w=Matrix.eye(3);
   
-  //setup mouse and keybord controll
-  
-
-  let mouse = {
-    x: undefined,
-    y: undefined,
-    left: false,  
-    right: false, 
-    middle: false
-  };
-
-  // Update mouse position and button state on mouse events
-  window.addEventListener('mousemove', (event) => {
-    const rect = mainCanvas.getBoundingClientRect();
-    const xcord=event.clientX - rect.left;
-    const ycord=event.clientY - rect.top;
-    //const dx=xcord-mouse.x;
-    //const dy=event.clientY-mouse.y;
-    if(mouse.x===undefined){
-      mouse.x=xcord;
-      mouse.y=ycord;
-    }
-
-    if(mouse.left){
-      
-      const width=rect.right-rect.left;
-      const height=rect.bottom-rect.top;
-      const fovfactor=1/Math.tan(radians(120)/2);
-      
-      const u= c=>(2.0*c-width)/width;//cords between [-1,1]
-      const v= c=>(2.0*c-height)/width;
-      const uangle=(Math.atan(u(xcord)/fovfactor)-Math.atan(u(mouse.x)/fovfactor));
-      const vangle=(Math.atan(v(ycord)/fovfactor)-Math.atan(v(mouse.y)/fovfactor));
-
-
-      c2w=Matrix.rotationMatrix(new Vector([0,1,0]),uangle).mul(
-          Matrix.rotationMatrix(new Vector([1,0,0]),vangle)).mul(
-          c2w);
-      canvasupdate=true;
-    }
-
-
-
-
-    mouse.x = xcord;
-    mouse.y = ycord;
-  });
-
-  mainCanvas.addEventListener('mousedown', (event) => {
-    // Update mouse button states
-    if (event.button === 0) mouse.left = true;    // Left button
-    if (event.button === 1) mouse.middle = true;  // Middle button
-    if (event.button === 2) mouse.right = true;   // Right button
-
-    const x = event.clientX;
-    const y = mainCanvas.height - event.clientY; // Flip Y since WebGL has (0,0) at bottom-left
-    const pixels = new Uint8Array(4); // RGBA
-    gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-    const color = `rgb(${(pixels[0]/255).toFixed(3)}, ${(pixels[1]/255).toFixed(3)}, ${(pixels[2]/255).toFixed(3)}, ${(pixels[3]/255).toFixed(3)})    rgb(${pixels[0]}, ${pixels[1]}, ${pixels[2]}, ${pixels[3]})    (${pixels[0]-128}, ${pixels[1]-128}, ${pixels[2]-128}, ${pixels[3]-128})`;
-    console.log(color); // Display the color in console or UI
-  });
-
-  window.addEventListener('mouseup', (event) => {
-    // Update mouse button states
-    if (event.button === 0) mouse.left = false;
-    if (event.button === 1) mouse.middle = false;
-    if (event.button === 2) mouse.right = false;
-  });
-
-
-  const keysPressed = {
-    w: false,
-    a: false,
-    s: false,
-    d: false,
-    q: false,
-    e: false,
-    shift: false,
-    space: false
-  };
-
-  // Handle keydown event
-  window.addEventListener('keydown', (event) => {
-    
-    if (event.key === ' ') {  // Space key
-      keysPressed.space = true;
-    }else{
-      keysPressed[event.key.toLowerCase()]=true;
-    }
-    
-  });
-
-  // Handle keyup event
-  window.addEventListener('keyup', (event) => {
-    if (event.key === ' ') {  // Space key
-      keysPressed.space = false;
-    }else{
-      keysPressed[event.key.toLowerCase()]=false;
-    }
-  });
-
   //main programm
   let deltatimeavg=0
   let lastTime = 0;
@@ -403,45 +457,21 @@ async function main(){
     lastTime = timestamp;
     
 
-    c2w=c2w.orthogonalize();//orthogonalize only against precision errors. probably unnessesary
-    let movementfactor=deltatime;
-    let deltapos=new Vector([0,0,0]);
-    if(keysPressed.shift)movementfactor/=10;
-    if(keysPressed.space)movementfactor*=5;
-    if(keysPressed.a)deltapos=deltapos.add(new Vector([-1,0,0]));
-    if(keysPressed.d)deltapos=deltapos.add(new Vector([1,0,0]));
-    if(keysPressed.s)deltapos=deltapos.add(new Vector([0,0,-1]));
-    if(keysPressed.w)deltapos=deltapos.add(new Vector([0,0,1]));
-    if(keysPressed.q){
-      c2w=Matrix.rotationMatrix(new Vector([0,1,0]),radians(movementfactor*30)).mul(c2w);
-      canvasupdate=true;
-    };
-    if(keysPressed.e){
-      c2w=Matrix.rotationMatrix(new Vector([0,1,0]),radians(-movementfactor*30)).mul(c2w);
-      canvasupdate=true;
-    };
-    deltapos=deltapos.mul(movementfactor*4);
-    if(deltapos.abs()>0){
-      canvasupdate=true;
-      cameraPos = cameraPos.add(c2w.transpose().mul(deltapos));
-      gl.uniform3fv(cameraPosLocation, cameraPos.array);
-
-    }
-
     
-    if(canvasupdate){
-      drawplot(c2w,cameraPos,funmat.array);
+
+    camera.update(deltatime);
+    if(camera.changed){
+      drawplot(camera.c2w,camera.cameraPos,funmat.array);
 
       deltatimeavg=deltatimeavg*0.95+deltatime*0.05;
       fpscounter.innerText = `FPS: ${Math.ceil(1/deltatimeavg)}`;
 
-      const c2wLocation = shader.getUniformLocation("cameraMatrix");
-      gl.uniformMatrix3fv(c2wLocation, false, new Float32Array(c2w.array.flat()));
+     camera.upadeuniforms(shader);
 
       //gl.clearColor(0.0, 0.0, 0.0, 1.0);
       //gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      canvasupdate=false;
+      camera.changed=false;
       
     }
     requestAnimationFrame(animate);

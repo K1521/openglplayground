@@ -9,6 +9,9 @@ const int numpolys=1;
 //const int numpolys=...;
 //const int MAXPOLYDEGREE=...;#line 11 1 //code before this is defined in other file
 uniform float[numpolys*polybasislength] coefficientsxyz;
+/*layout(std140) uniform MyUBO {
+    float[numpolys*polybasislength] coefficientsxyz;
+};*/
 
 //step divided by length of deriv in xyz
 
@@ -75,6 +78,9 @@ float vmax(vec3 v) {
 #define Dualxyz vec4
 
 Dualxyz DualxyzMul(Dualxyz a,Dualxyz b){
+  //  vec3 v = a.w * b.xyz + b.w * a.xyz;
+//return Dualxyz(v.x, v.y, v.z, a.w * b.w);
+//return Dualxyz(a.w*b.x+b.w*a.x,a.w*b.y+b.w*a.y,a.w*b.z+b.w*a.z,a.w*b.w);
     return Dualxyz(a.w*b.xyz+b.w*a.xyz,a.w*b.w);
 }
 Dualxyz DualxyzSqr(Dualxyz a){
@@ -108,41 +114,47 @@ Dualxyz DualxyzSummofsquares(vec3 rayDir, vec3 rayOrigin){
     Dualxyz rp=(r+Dualxyz(0.,0.,0.,1.))*0.5;
     Dualxyz rm=(r-Dualxyz(0.,0.,0.,1.))*0.5;
 
-    Dualxyz xy=DualxyzMul(x,y);
-    Dualxyz yz=DualxyzMul(y,z);
-    Dualxyz zx=DualxyzMul(z,x);
+    
+    if(numpolys==1){
 
-    Dualxyz xrp=DualxyzMul(x,rp);
-    Dualxyz xrm=DualxyzMul(x,rm);
-    Dualxyz yrp=DualxyzMul(y,rp);
-    Dualxyz yrm=DualxyzMul(y,rm);
-    Dualxyz zrp=DualxyzMul(z,rp);
-    Dualxyz zrm=DualxyzMul(z,rm);
+        return DualxyzSqr(
+            DualxyzMul(x,x*coefficientsxyz[0]+y*coefficientsxyz[1]+z*coefficientsxyz[2]+rm*coefficientsxyz[3]+rp*coefficientsxyz[4])+
+            DualxyzMul(y,y*coefficientsxyz[5]+z*coefficientsxyz[6]+rm*coefficientsxyz[7]+rp*coefficientsxyz[8])+
+            DualxyzMul(z,z*coefficientsxyz[9]+rm*coefficientsxyz[10]+rp*coefficientsxyz[11])+
+            DualxyzMul(rm,rm*coefficientsxyz[12]+rp*coefficientsxyz[13])+
+            DualxyzSqr(rp)*coefficientsxyz[14]
+        );
+    }
 
-    Dualxyz rprp=DualxyzMul(rp,rp);
-    Dualxyz rmrm=DualxyzMul(rm,rm);
-    Dualxyz rprm=DualxyzMul(rp,rm);
+    Dualxyz basis[15];
+    basis[0] = xx;
+    basis[1] = DualxyzMul(x,y);
+    basis[2] = DualxyzMul(x,z);
+    basis[3] = DualxyzMul(x,rm);
+    basis[4] = DualxyzMul(x,rp);
+    basis[5] = yy;
+    basis[6] = DualxyzMul(y,z);
+    basis[7] = DualxyzMul(y,rm);
+    basis[8] = DualxyzMul(y,rp);
+    basis[9] = zz;
+    basis[10] = DualxyzMul(z,rm);
+    basis[11] = DualxyzMul(z,rp);
+    basis[12] = DualxyzSqr(rm);
+    basis[13] = DualxyzMul(rp,rm);
+    basis[14] = DualxyzSqr(rp);
 
     Dualxyz sum=Dualxyz(0.);
     for(int i=0;i<numpolys;i++){
         int index=polybasislength*i;
-        sum+=DualxyzSqr(
-            coefficientsxyz[index+0]*xx+
-            coefficientsxyz[index+1]*xy+
-            coefficientsxyz[index+2]*zx+
-            coefficientsxyz[index+3]*xrm+
-            coefficientsxyz[index+4]*xrp+
-            coefficientsxyz[index+5]*yy+
-            coefficientsxyz[index+6]*yz+
-            coefficientsxyz[index+7]*yrm+
-            coefficientsxyz[index+8]*yrp+
-            coefficientsxyz[index+9]*zz+
-            coefficientsxyz[index+10]*zrm+
-            coefficientsxyz[index+11]*zrp+
-            coefficientsxyz[index+12]*rmrm+
-            coefficientsxyz[index+13]*rprm+
-            coefficientsxyz[index+14]*rprp
-            );
+        Dualxyz term = vec4(0.0);
+        
+        // Accumulate the weighted sum
+        for (int j = 0; j < 15; j++) {
+            term += coefficientsxyz[index + j] * basis[j];
+        }
+        
+        // Square and add to sum
+        sum += DualxyzSqr(term);
     }
     return (sum);
 
@@ -172,6 +184,7 @@ float DualxyzRaymarch(vec3 rayDir, inout vec3 rayOrigin) {
 
         float dx= abs(res.w / length(res.xyz))*2.;
         x+=dx;
+        if(dx<0.0001)break;
         /*if(dx<0.0001){
             //debugcolor(vec3(0.,0.,float(i+1)/20.));
             //debugcolor(vec3(0.,0.,float(i+1)/10.));
@@ -194,11 +207,11 @@ float DualxyzRaymarch(vec3 rayDir, inout vec3 rayOrigin) {
             break;
         }*/
         //if(i==55)debugcolor(vec3((dx)));
-        if(dx==0.||i==59){
+        /*if(dx==0.||i==59){
             //debugcolor(vec3(float(i+1)/60.));
             //debugcolor(vec3(float(i+1)/60.,log2(res.w)/256.+0.5,log2(dx)/256.+0.5));
             break;
-        }
+        }*/
 
         //x += min(4., abs(max(f-00.01,0.) / (length(2.*res.xyz)+0.01)));
 
