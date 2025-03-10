@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Geometric Algebra</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <style>
     body, html {
       margin: 0;
@@ -28,24 +29,133 @@
       padding: 5px;
       border-radius: 5px;
     }
+    #diagramPanel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 400px;
+      height: 300px;
+      background-color: rgba(0, 0, 0, 0.7);
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    #plotlyDiagram {
+      width: 100%;
+      height: 100%;
+      /*background-color: white;*/
+      /*border-radius: 5px;*/
+    }
   </style>
 </head>
 <body>
-  <canvas id="myCanvas"></canvas>
+  <canvas id="mainCanvas"></canvas>
   <div id="fpsCounter">FPS: 0</div>
 
+  <div id="diagramPanel">
+    <div id="plotlyDiagram"></div>
+  </div>
   <script type="module">
-import { Vector, Matrix } from './linalg1.js';
+
+
+import { Vector, Matrix, Multidual } from './linalg1.js';
 
 const fpscounter=document.getElementById('fpsCounter')
-const canvas = document.getElementById('myCanvas');
-const gl = canvas.getContext('webgl2');
+const mainCanvas = document.getElementById('mainCanvas');
+const diagramCanvas = document.getElementById('diagramCanvas');
+const gl = mainCanvas.getContext('webgl2',{preserveDrawingBuffer: true});//preserveDrawingBuffer for color picking
 //console.log(gl);
 if (!gl) {
   alert("WebGL not supported!");
 }
 
 
+const xValues = [];
+let yValues = [];
+for (let x = 0; x <= 20; x += 0.1) {
+  xValues.push(x);
+  yValues.push(0);
+}
+const traces = [{
+  x: xValues,
+  y: yValues,
+  mode: 'lines',
+  name: 'f(x)',
+  line: { color: 'blue' }
+}];
+Plotly.newPlot('plotlyDiagram',traces , { title: 'f' ,margin:{l:40,r:20,b:40,t:40}});
+
+
+function DualSummofsquares(rayDir, rayOrigin,coefficients){
+
+    //Multidual(f,dx,dy,dz,d1,d2,d3);
+    const x=new Multidual(rayOrigin.x(),1,0,0,rayDir.x(),0,0);
+    const y=new Multidual(rayOrigin.y(),0,1,0,rayDir.y(),0,0);
+    const z=new Multidual(rayOrigin.z(),0,0,1,rayDir.z(),0,0);
+    
+    const xx=x.square();
+    const yy=y.square();
+    const zz=z.square();
+
+    const r=xx.add(yy).add(zz);
+    const rp=(r.add(1)).mul(0.5);
+    const rm=(r.add(-1)).mul(0.5);
+
+    const xy=x.mul(y);
+    const yz=y.mul(z);
+    const zx=z.mul(x);
+
+    const xrp=x.mul(rp);
+    const xrm=x.mul(rm);
+    const yrp=y.mul(rp);
+    const yrm=y.mul(rm);
+    const zrp=z.mul(rp);
+    const zrm=z.mul(rm);
+
+    const rprp=rp.mul(rp);
+    const rmrm=rm.mul(rm);
+    const rprm=rp.mul(rm);
+
+    const terms = [
+      xx, xy, zx, xrm, xrp,
+      yy, yz, yrm, yrp,
+      zz, zrm, zrp,
+      rmrm, rprm, rprp
+    ];
+
+    let sum=new Multidual(0,0,0,0,0,0,0);
+    for(let j=0;j<coefficients.length;j++){
+
+        let blade = new Multidual(0,0,0,0,0,0,0); // Start with first term
+        for (let i = 0; i < terms.length; i++) {
+          blade = blade.add(terms[i].mul(coefficients[j][i]));
+        }
+
+        sum=sum.add(blade.square());
+    }
+    return (sum);
+
+    //[x**2, x*y, x*z, rm*x, rp*x, y**2, y*z, rm*y, rp*y, z**2, rm*z, rp*z, rm**2, rm*rp, rp**2]
+}
+function drawplot(c2w,cameraPos,coefficients){
+  const raydir=c2w.transpose().mul(new Vector([0,0,1]));
+  for(let i=0;i<xValues.length;i++){
+
+    const res=DualSummofsquares(raydir,cameraPos.add(raydir.mul(xValues[i])),coefficients);
+    //let x=new Multidual(-0.001,0,0,0,1,0,0);
+    //let xx=x.square().sqrt();
+    //let xxx=xx;//xx.mul(xx).mul(xx);
+    //yValues[i]=xxx.d3;
+    //console.log(`${xxx.f} ${xxx.d1} ${xxx.d2} ${xxx.d3}`);
+    yValues[i]=Math.sqrt(res.f);//ganja
+    //yValues[i]=res.f/Math.sqrt(res.dx*res.dx+res.dy*res.dy,res.dz*res.dz);//newton2
+    //yValues[i]=res.f/res.d1;//newton1
+    //yValues[i]=-2*res.f*res.d1/(2*res.d1*res.d1-res.f*res.d2);
+    //yValues[i]=-2*res.f*res.d1/(res.d1*(1+Math.sqrt((1-2*res.f*res.d2/(res.d1*res.d1)))));
+    //console.log(yValues[i]);
+  }
+  Plotly.redraw('plotlyDiagram');
+}
 
 const vertexShaderSource = `#version 300 es
   in vec4 a_position;
@@ -54,10 +164,10 @@ const vertexShaderSource = `#version 300 es
   }
 `;
 
-async function loadShader(url) {
+async function load(url) {
   const response = await fetch(url);
   if (!response.ok) {
-    console.error('Failed to load shader:', url);
+    console.error('Failed to load:', url);
     return '';
   }
   return await response.text();
@@ -72,6 +182,7 @@ function compileShader(gl, source, type) {
   gl.compileShader(shader);
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
     console.error("Shader compile failed:", gl.getShaderInfoLog(shader));
+    alert(gl.getShaderInfoLog(shader));
   }
   return shader;
 }
@@ -98,7 +209,7 @@ function sleep(ms) {
 
 
 async function main(){
-  const fragmentShaderSource =await loadShader("./frag2.glsl"); 
+  const fragmentShaderSource =await load("./frag3.glsl"); 
   //console.log(fragmentShaderSource);
 
   const shaderProgram = createProgram(gl, vertexShaderSource,fragmentShaderSource );
@@ -112,8 +223,8 @@ async function main(){
       gl.uniform1f(location, funmat.array[i][j]);
     }
 
-  //draw rect
-
+  
+  //setup glsl
   const vertices = new Float32Array([
     -1, 1,
     -1,-1,
@@ -121,8 +232,8 @@ async function main(){
     1,-1
   ]);
 
-  const buffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  const verticesbuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, verticesbuffer);
   gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
   const positionAttribLocation = gl.getAttribLocation(shaderProgram, "a_position");
@@ -135,13 +246,24 @@ async function main(){
   gl.uniform3fv(cameraPosLocation, cameraPos.array);
 
   const windowsizeLocation = gl.getUniformLocation(shaderProgram, 'windowsize');
-  const windowsize = [canvas.width, canvas.height];
-  gl.uniform2fv(windowsizeLocation, windowsize);
+  let canvasupdate=true;
+  
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    mainCanvas.width = mainCanvas.clientWidth * dpr;
+    mainCanvas.height = mainCanvas.clientHeight * dpr;
+    gl.viewport(0, 0, mainCanvas.width, mainCanvas.height);
+    const windowsize = [mainCanvas.width, mainCanvas.height];
+    gl.uniform2fv(windowsizeLocation, windowsize);
+    canvasupdate=true;
+  }
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
 
   let c2w=Matrix.eye(3);
-  //const rotr1=Matrix.rotationMatrix(new Vector([0,1,0]),radians(1));
-
-  let canvasupdate=true;
+  
+  //setup mouse and keybord controll
+  
 
   let mouse = {
     x: undefined,
@@ -153,7 +275,7 @@ async function main(){
 
   // Update mouse position and button state on mouse events
   window.addEventListener('mousemove', (event) => {
-    const rect = canvas.getBoundingClientRect();
+    const rect = mainCanvas.getBoundingClientRect();
     const xcord=event.clientX - rect.left;
     const ycord=event.clientY - rect.top;
     //const dx=xcord-mouse.x;
@@ -165,12 +287,12 @@ async function main(){
 
     if(mouse.left){
       
-      const deltax=rect.right-rect.left;
-      const deltay=rect.bottom-rect.top;
+      const width=rect.right-rect.left;
+      const height=rect.bottom-rect.top;
       const fovfactor=1/Math.tan(radians(120)/2);
       
-      const u= c=>(2.0*c-deltax)/deltax;//cords between [-1,1]
-      const v= c=>(2.0*c-deltay)/deltax;
+      const u= c=>(2.0*c-width)/width;//cords between [-1,1]
+      const v= c=>(2.0*c-height)/width;
       const uangle=(Math.atan(u(xcord)/fovfactor)-Math.atan(u(mouse.x)/fovfactor));
       const vangle=(Math.atan(v(ycord)/fovfactor)-Math.atan(v(mouse.y)/fovfactor));
 
@@ -188,11 +310,18 @@ async function main(){
     mouse.y = ycord;
   });
 
-  canvas.addEventListener('mousedown', (event) => {
+  mainCanvas.addEventListener('mousedown', (event) => {
     // Update mouse button states
     if (event.button === 0) mouse.left = true;    // Left button
     if (event.button === 1) mouse.middle = true;  // Middle button
     if (event.button === 2) mouse.right = true;   // Right button
+
+    const x = event.clientX;
+    const y = mainCanvas.height - event.clientY; // Flip Y since WebGL has (0,0) at bottom-left
+    const pixels = new Uint8Array(4); // RGBA
+    gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    const color = `rgb(${(pixels[0]/255).toFixed(3)}, ${(pixels[1]/255).toFixed(3)}, ${(pixels[2]/255).toFixed(3)}, ${(pixels[3]/255).toFixed(3)})    rgb(${pixels[0]}, ${pixels[1]}, ${pixels[2]}, ${pixels[3]})    (${pixels[0]-128}, ${pixels[1]-128}, ${pixels[2]-128}, ${pixels[3]-128})`;
+    console.log(color); // Display the color in console or UI
   });
 
   window.addEventListener('mouseup', (event) => {
@@ -208,56 +337,42 @@ async function main(){
     a: false,
     s: false,
     d: false,
+    q: false,
+    e: false,
     shift: false,
     space: false
   };
 
   // Handle keydown event
   window.addEventListener('keydown', (event) => {
-    if (event.key === 'w' || event.key === 'W') {
-      keysPressed.w = true;
-    } else if (event.key === 'a' || event.key === 'A') {
-      keysPressed.a = true;
-    } else if (event.key === 's' || event.key === 'S') {
-      keysPressed.s = true;
-    } else if (event.key === 'd' || event.key === 'D') {
-      keysPressed.d = true;
-    } else if (event.key === 'Shift') {
-      keysPressed.shift = true;
-    } else if (event.key === ' ') {  // Space key
+    
+    if (event.key === ' ') {  // Space key
       keysPressed.space = true;
+    }else{
+      keysPressed[event.key.toLowerCase()]=true;
     }
     
   });
 
   // Handle keyup event
   window.addEventListener('keyup', (event) => {
-    if (event.key === 'w' || event.key === 'W') {
-      keysPressed.w = false;
-    } else if (event.key === 'a' || event.key === 'A') {
-      keysPressed.a = false;
-    } else if (event.key === 's' || event.key === 'S') {
-      keysPressed.s = false;
-    } else if (event.key === 'd' || event.key === 'D') {
-      keysPressed.d = false;
-    } else if (event.key === 'Shift') {
-      keysPressed.shift = false;
-    } else if (event.key === ' ') {  // Space key
+    if (event.key === ' ') {  // Space key
       keysPressed.space = false;
+    }else{
+      keysPressed[event.key.toLowerCase()]=false;
     }
   });
 
-  
+  //main programm
   let deltatimeavg=0
   let lastTime = 0;
   function animate(timestamp){
     let deltatime = (timestamp - lastTime) / 1000; // Convert to seconds
     lastTime = timestamp;
-    deltatimeavg=deltatimeavg*0.95+deltatime*0.05;
-    fpscounter.innerText = `FPS: ${Math.ceil(1/deltatimeavg)}`;
+    
 
-    //c2w=c2w.mul(rotr1).orthogonalize();//orthogonalize only against precision errors. probably unnessesary
-    let movementfactor=deltatime*4;
+    c2w=c2w.orthogonalize();//orthogonalize only against precision errors. probably unnessesary
+    let movementfactor=deltatime;
     let deltapos=new Vector([0,0,0]);
     if(keysPressed.shift)movementfactor/=10;
     if(keysPressed.space)movementfactor*=5;
@@ -265,7 +380,15 @@ async function main(){
     if(keysPressed.d)deltapos=deltapos.add(new Vector([1,0,0]));
     if(keysPressed.s)deltapos=deltapos.add(new Vector([0,0,-1]));
     if(keysPressed.w)deltapos=deltapos.add(new Vector([0,0,1]));
-    deltapos=deltapos.mul(movementfactor);
+    if(keysPressed.q){
+      c2w=Matrix.rotationMatrix(new Vector([0,1,0]),radians(movementfactor*30)).mul(c2w);
+      canvasupdate=true;
+    };
+    if(keysPressed.e){
+      c2w=Matrix.rotationMatrix(new Vector([0,1,0]),radians(-movementfactor*30)).mul(c2w);
+      canvasupdate=true;
+    };
+    deltapos=deltapos.mul(movementfactor*4);
     if(deltapos.abs()>0){
       canvasupdate=true;
       cameraPos = cameraPos.add(c2w.transpose().mul(deltapos));
@@ -275,6 +398,11 @@ async function main(){
 
     
     if(canvasupdate){
+      drawplot(c2w,cameraPos,funmat.array);
+
+      deltatimeavg=deltatimeavg*0.95+deltatime*0.05;
+      fpscounter.innerText = `FPS: ${Math.ceil(1/deltatimeavg)}`;
+
       const c2wLocation = gl.getUniformLocation(shaderProgram, "cameraMatrix");
       gl.uniformMatrix3fv(c2wLocation, false, new Float32Array(c2w.array.flat()));
 

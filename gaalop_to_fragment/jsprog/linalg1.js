@@ -1,4 +1,4 @@
-export { Vector, Matrix };
+export { Vector, Matrix, Multidual };
 
 
 class Vector {
@@ -147,7 +147,7 @@ class Matrix {
         throw new TypeError(`Incompatible types for matmul: ${typeof this} and ${typeof B}`);
     }
 
-    add(B) {
+    add(B) {//TODO check type and add skalar addition
         const [rowsA, colsA] = this.size();
         const [rowsB, colsB] = B.size();
 
@@ -293,3 +293,165 @@ class Matrix {
         return new Matrix(transposed);
     }
 }
+
+
+class Multidual{
+    constructor(f,dx,dy,dz,d1,d2,d3){
+        this.f=f;
+        this.dx=dx;
+        this.dy=dy;
+        this.dz=dz;
+        this.d1=d1;
+        this.d2=d2;
+        this.d3=d3;
+    }
+    add(other){//TODO add typechecks
+        if(typeof other === "number")return new Multidual(this.f+other,this.dx,this.dy,this.dz,this.d1,this.d2,this.d3);
+        return new Multidual(this.f+other.f,this.dx+other.dx,this.dy+other.dy,this.dz+other.dz,this.d1+other.d1,this.d2+other.d2,this.d3+other.d3);
+    }
+    sub(other){//TODO add typechecks
+        if(typeof other === "number")return new Multidual(this.f-other,this.dx,this.dy,this.dz,this.d1,this.d2,this.d3);
+        return new Multidual(this.f-other.f,this.dx-other.dx,this.dy-other.dy,this.dz-other.dz,this.d1-other.d1,this.d2-other.d2,this.d3-other.d3);
+    }
+    mul(other){//TODO add typechecks
+        if(typeof other === "number")return new Multidual(other*this.f,other*this.dx,other*this.dy,other*this.dz,other*this.d1,other*this.d2,other*this.d3);
+        return new Multidual(
+            this.f*other.f,
+            this.dx*other.f+this.f*other.dx,
+            this.dy*other.f+this.f*other.dy,
+            this.dz*other.f+this.f*other.dz,
+            this.d1*other.f+this.f*other.d1,//d1
+            this.d2*other.f+2*this.d1*other.d1+this.f*other.d2,//d2
+            this.d3*other.f+3*(this.d2*other.d1+this.d1*other.d2)+this.f*other.d3//d3
+        );
+    }
+    square(){
+        return this.mul(this);
+    }
+    sqrt(){
+        const sqrtf=Math.sqrt(this.f);
+        const halfinvsqrt=1/(2*sqrtf);
+        return new Multidual(sqrtf,this.dx*halfinvsqrt,this.dy*halfinvsqrt,this.dz*halfinvsqrt,this.d1*halfinvsqrt,(2*this.f*this.d2-this.d1*this.d1)/(4*this.f*sqrtf),this.d3*halfinvsqrt-3*this.d1*(2*this.f*this.d2-this.d1*this.d1)/(8*this.f*this.f*sqrtf));
+    }
+}
+
+class Complex {
+    constructor(real, imag) {
+      if (real instanceof Complex) {
+        // Copy constructor
+        this.real = real.real;
+        this.imag = real.imag;
+      } else {
+        this.real = real || 0;
+        this.imag = imag || 0;
+      }
+    }
+
+    static complexify(x){
+        if (typeof other === "Complex")return x;
+        return new Complex(other);
+    }
+  
+    add(other) {
+      if (typeof other === "number") other = new Complex(other);
+      return new Complex(this.real + other.real, this.imag + other.imag);
+    }
+  
+    sub(other) {
+      if (typeof other === "number") other = new Complex(other);
+      return new Complex(this.real - other.real, this.imag - other.imag);
+    }
+  
+    multiply(other) {
+      if (typeof other === "number") other = new Complex(other);
+      return new Complex(
+        this.real * other.real - this.imag * other.imag,
+        this.real * other.imag + this.imag * other.real
+      );
+    }
+  
+    div(other) {
+      if (typeof other === "number") other = new Complex(other);
+      const denom = other.real * other.real + other.imag * other.imag;
+      return new Complex(
+        (this.real * other.real + this.imag * other.imag) / denom,
+        (this.imag * other.real - this.real * other.imag) / denom
+      );
+    }
+
+    inv() {
+        const denom = this.real * this.real + this.imag * this.imag;
+        return new Complex(
+          (this.real) / denom,
+          (- this.imag) / denom
+        );
+    }
+  
+    square() {
+      return this.multiply(this);
+    }
+  
+    sqrt() {
+      const r = this.abs();
+  
+      if (this.real < 0 && this.imag === 0) {
+        // Negative real number case: sqrt(-r) = i * sqrt(r)
+        return new Complex(0, Math.sqrt(r));
+      }
+  
+      const z_plus_r = this.add(r);
+      const mod_z_plus_r = Math.sqrt(z_plus_r.real ** 2 + z_plus_r.imag ** 2);
+  
+      return new Complex(
+        Math.sqrt(r) * (z_plus_r.real / mod_z_plus_r),
+        Math.sqrt(r) * (z_plus_r.imag / mod_z_plus_r)
+      );
+    }
+  
+    abs() {
+      return Math.sqrt(this.real * this.real + this.imag * this.imag);
+    }
+  
+    conjugate() {
+      return new Complex(this.real, -this.imag);
+    }
+  
+    toString() {
+      return `${this.real} + ${this.imag}i`;
+    }
+  }
+
+class Complexdual{
+    constructor(f,d1,d2){
+        this.f =Complex.complexify(f );
+        this.d1=Complex.complexify(d1);
+        this.d2=Complex.complexify(d2);
+    }
+    add(other){//TODO add typechecks
+        if(typeof other === "number")return new Complexdual(this.f.add(other),this.d1,this.d2);
+        return new Complexdual(this.f.add(other.f),this.d1.add(other.d1),this.d2.add(other.d2));
+    }
+    sub(other){//TODO add typechecks
+        if(typeof other === "number")return new Complexdual(this.f.sub(other),this.d1,this.d2);
+        return new Complexdual(this.f.sub(other.f),this.d1.sub(other.d1),this.d2.sub(other.d2));
+    }
+    mul(other){//TODO add typechecks
+        if(typeof other === "number")return new Complexdual(this.f.mul(other),this.d1.mul(other),this.d2.mul(other));
+        return new Complexdual(
+            this.f.mul(other.f),
+            this.d1.mul(other.f).add(this.f.mul(other.d1)),//d1
+            this.d2.mul(other.f).add(mul(this.d1).mul(other.d1).mul(2)).add(this.f.mul(other.d2))//d2
+        );
+    }
+    square(){
+        return this.mul(this);
+    }
+    sqrt(){
+        const sqrtf=this.f.sqrt();
+
+        return new Complexdual(sqrtf,this.d1.div(sqrtf.mul(2)),(this.f.mul(this.d2).mul(2).sub(this.d1.square())).div(this.f.mul(sqrtf).mul(4)));
+    }
+}
+//-1/4*f(x)**(-3/2)*f'(x)**2+1/2*f(x)**(-1/2)*f''(x)
+
+//-f'/(4*f**(3/2))+f''*(2*f**(1/2))
