@@ -18,7 +18,7 @@ tracer=TraceBasis(dcga.point)
 def funtoviz(point):
     obj=dcga.toroid(2,0.5)
     #obj=dcga.Plane(1,1,1,0.01)
-    obj=dcga.Plane(1,1,1,0.01).outer(dcga.toroid(2,0.5))
+    #obj=dcga.Plane(1,1,1,0.01).outer(dcga.toroid(2,0.5))
     #obj=dcga.Plane(1,1,1,0.01).inner(dcga.toroid(2,0.5))
 
     #obj=sanwich(t,obj)
