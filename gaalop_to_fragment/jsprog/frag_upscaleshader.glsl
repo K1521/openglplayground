@@ -10,14 +10,10 @@ const int numpolys=1;
 //const int numpolys=...;
 //const int MAXPOLYDEGREE=...;#line 11 1 //code before this is defined in other file
 uniform float[numpolys*polybasislength] coefficientsxyz;
-/*layout(std140) uniform MyUBO {
-    float[numpolys*polybasislength] coefficientsxyz;
-};*/
-
-//step divided by length of deriv in xyz
-
-//in vec2 fragUV;
-out vec4 color;
+//uniform sampler2D roots01tex;
+//uniform sampler2D roots23tex;
+uniform float mipLevel;
+uniform float aspectratio; 
 
 uniform vec3 cameraPos;
 //uniform vec3 lightPos;
@@ -25,7 +21,9 @@ uniform vec3 cameraPos;
 uniform vec2 windowsize;
 uniform mat3 cameraMatrix;
 
-
+layout(location = 0) out vec4 roots01out;
+layout(location = 1) out vec4 roots23out;
+ 
 const float FOV=120.;
 const float FOVfactor=1./tan(radians(FOV) * 0.5);
 const float EPSILON_RAYMARCHING=0.001;
@@ -247,106 +245,42 @@ void initial_roots(out Complex[4] roots,Complex center) {
     }
 }
 
-float DualComplexRaymarch(vec3 rayDir, inout vec3 rayOrigin) {
-    
-    Complex[4] roots;
-    initial_roots(roots,Complex(1.0,0.0));
-    //inout Complex[4] roots, vec3 rayDir, vec3 rayOrigin,int pdegree
-    aberth_method(roots,rayDir,rayOrigin,4);
-
-    float beste=inf;
-    float bestx=inf;
-    for(int i = 0; i < 4; ++i){
-        Complex r=roots[i];
-        r.y=abs(r.y);
-        if(r.x>=0. && r.y<beste){
-            beste=r.y;
-            bestx=r.x;
-        }
-    }
-    /*for(int i=3;i>0;i--){//bubblesort
-        for(int j=0;j<i;j++){
-            if(roots[j].x>roots[j+1].x){
-                vec2 temp=roots[j];
-                roots[j]=roots[j+1];
-                roots[j+1]=temp;
-            }
-        }
-    }
-    
-    int i=3;
-    beste=roots[i].y;
-    bestx=roots[i].x;
-    if(bestx<0.)beste=inf;*/
-
-
-    rayOrigin += rayDir * bestx;
-    return beste;
-}
 
 
 
 
 
 void main() {
-    vec2 uv=(2.*gl_FragCoord.xy-windowsize)/windowsize.x;
-    //vec2 uv=(2.*gl_FragCoord.xy-windowsize)/windowsize*vec2(1.,windowsize.y/windowsize.x);
+    //vec2 uv=(2.*gl_FragCoord.xy-windowsize)/windowsize.x;
+    vec2 uv=(gl_FragCoord.xy)/windowsize;
+    vec2 uvray=(uv*2.-1.)/vec2(1.,aspectratio);
+    
     vec3 rayOrigin = cameraPos;
-    vec3 rayDir =cameraMatrix*normalize(vec3(uv, FOVfactor));//cam to view
+    vec3 rayDir =cameraMatrix*normalize(vec3(uvray, FOVfactor));//cam to view
    
-
-    // Sphere tracing
-
-    vec3 p=rayOrigin;//vec3(0);//rayOrigin;
-    float dist=DualComplexRaymarch(rayDir,p);
-    //float x=dot(rayDir,p-rayOrigin);
-    //debugcolor(vec3((x)/10.));
-    //float dist=DualComplexRaymarch4(rayDir,p);
-    //p=(cameraMatrix)*p+rayOrigin;
-
-
-        
+    //vec4 roots01in=//texture(roots01tex, uv);//, mipLevel);
+    //vec4 roots23in=//texture(roots23tex, uv);//, mipLevel);
+    Complex[4] roots;
+    /*roots[0]=roots01in.xy;
+    roots[1]=roots01in.zw;
+    roots[2]=roots23in.xy;
+    roots[3]=roots23in.zw;*/
+initial_roots(roots,vec2(0.));
     
-    // Checkerboard pattern
-    float checker = 0.3 + 0.7 * mod(sum(floor(p * 4.0)), 2.0); // Alternates between 0.5 and 1.0
-    //float checker = 0.3 + 0.7 * mod(sum(floor(p/(length(p-rayOrigin)/100+1) * 4.0)), 2.0);
-    //checker=(abs(mod(p.x,0.3))<0.03 || abs(mod(p.y,0.3))<0.03 || abs(mod(p.z,0.3))<0.03) ?1.0:0.3;
-    
-    vec3 col=vec3(checker);
-    //col=vec3(1);
-    col*=1.;//normaltocol(transpose(cameraMatrix)*getNormal(p));
-    //col=vec3(abs());
-    //col=getlight(p,rayDir,col);
-    //col=pow(col,vec3(0.4545));//gamma correction
-    //col=pow(col,vec3(2));
-
-    /*if ((abs(dist) < EPSILON_RAYMARCHING)) {
-        col*=vec3(0.5,1,0.5);
-    }else if ((abs(dist) < EPSILON_RAYMARCHING*10)){
-
-    } 
-    else {
-        col*=vec3(1,0.5,0.5);//red tint
-        
-        //color = vec4(0.0, 0.0, 0.0, 1.0); // Background
-    }*/
-    col*=mix(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), clamp(dist*20.,0.,1.));
-    
-    if(any(isnan(col))){
-        col=vec3(1.,1.,0.);//nan is yellow
-    }
-    if(any(isinf(vec3(p))) || abs(p.x)>10E10||abs(p.y)>10E10||abs(p.z)>10E10){
-        col=vec3(0.,0.,0.5);//blue
-    }
-    //if(length(uv)<0.01){col*=vec3(0.7,1,0.7);}//dot in middle of screen
-    if(length(uv)<0.01 && length(uv)>0.005){col=vec3(0.5,1,0.5);}//circle in middle of screen
 
 
-    if(overrideactive){
-        col=overwritecol;
-    }
+    aberth_method(roots,rayDir,rayOrigin,4);
 
-    color= vec4(col,1.);
+    /*vec2 x=vec2(1.,1.);
+
+    roots[0]=x;
+    roots[1]=x;
+    roots[2]=x;
+    roots[3]=x;*/
+
+
+    roots01out=vec4(roots[0],roots[1]);
+    roots23out=vec4(roots[2],roots[3]);
 }
 
 

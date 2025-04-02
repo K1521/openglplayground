@@ -158,7 +158,7 @@ function drawplot(camera,coefficients){
 }
 
 const vertexShaderSource = `#version 300 es
-  in vec4 a_position;
+  layout(location = 0) in vec4 a_position;
   void main(void) {
     gl_Position = a_position;
   }
@@ -178,28 +178,29 @@ async function load(url) {
 
 class Shader{
   constructor(gl,vertexShaderSource,fragmentShaderSource){
-    this.programm=Shader.createProgram(gl, vertexShaderSource,fragmentShaderSource );
+    this.program=Shader.createProgram(gl, vertexShaderSource,fragmentShaderSource );
     this.gl=gl;
     this.attributelocations=new Map();
     this.uniformlocations=new Map();
   }
 
   use(){
-    this.gl.useProgram(this.programm);
+    this.gl.useProgram(this.program);
   }
 
   getUniformLocation(name){
     var loc=this.uniformlocations.get(name);
     if(loc==undefined){
-      loc=this.gl.getUniformLocation(this.programm,name);
+      loc=this.gl.getUniformLocation(this.program,name);
       this.uniformlocations.set(name,loc);
+      console.log(name,loc);
     }
     return loc;
   }
   getAttribLocation(name){
     var loc=this.attributelocations.get(name);
     if(loc==undefined){
-      loc=this.gl.getAttribLocation(this.programm,name);
+      loc=this.gl.getAttribLocation(this.program,name);
       this.attributelocations.set(name,loc);
     }
     return loc;
@@ -428,9 +429,9 @@ class renderingpipeline{
     let gl=this.shader.gl;
     const ubo = gl.createBuffer();
     gl.bindBuffer(gl.UNIFORM_BUFFER, ubo);
-    const blockIndex = gl.getUniformBlockIndex(this.shader.programm, "MyUBO");
+    const blockIndex = gl.getUniformBlockIndex(this.shader.program, "MyUBO");
     // Bind the UBO to a binding point (0 in this case)
-    gl.uniformBlockBinding(shader.programm, blockIndex, 0);
+    gl.uniformBlockBinding(shader.program, blockIndex, 0);
     // Bind the UBO to the uniform binding point (0)
     gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, ubo);
     this.funmatbuffer=ubo;
@@ -459,28 +460,166 @@ class renderingpipeline{
 }
 
 
+function createResolutionPyramid(targetWidth, targetHeight, samplingFactor=16, maxThreads=1024) {
+    let resolutions = [];
+    let w = targetWidth, h = targetHeight;
+
+    do {
+        resolutions.push([Math.max(1, Math.floor(w)), Math.max(1, Math.floor(h))]);
+        w /= samplingFactor;
+        h /= samplingFactor;
+    }while(Math.floor(w) * Math.floor(h) >= maxThreads && (w > 1 || h > 1));
+
+    // Ensure (1,1) is in the list
+    if (resolutions[resolutions.length - 1][0] !== 1 || resolutions[resolutions.length - 1][1] !== 1) {
+        resolutions.push([1, 1]);
+    }
+
+    
+
+    return resolutions;
+}
+
+function createFloatTexture(gl, width, height) {
+  let textures=[];
+  let resolutions=createResolutionPyramid(width, height);
+  for(let i =0;i<2;i++){
+    
+    let texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
+    // Allocate a floating-point texture (RGBA32F)
+    resolutions.forEach((res,level)=>gl.texImage2D(gl.TEXTURE_2D, level, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, null));
+    
+    gl.texImage2D(gl.TEXTURE_2D, resolutions.length-1, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT,new Float32Array([1.,1.,1.342,1.243,1.237656443,1.23445993434,1.23894324,1.5656]));
+
+
+    // Set texture filtering
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    textures.push(texture);
+  }
+    return [textures,resolutions];
+}
+
 async function main(){
   //const fragmentShaderSource =await load("./frag3.glsl"); 
   const fragmentShaderSource =await load("./frag_aberth.glsl"); 
   //console.log(fragmentShaderSource);
 
-  const shader =new Shader(gl, vertexShaderSource,fragmentShaderSource );
+  const shader = new Shader(gl, vertexShaderSource,fragmentShaderSource );
   shader.use();
   const camera=new Cameracontroll(mainCanvas);
   
   let funmat=new Matrix([[-3.2,0., 0., 0., 0.,-3.2,0., 0., 0., 0., 0., 0., 1.5125, -5.225,   4.5125]]);
   /**/
-  let renderer=new renderingpipeline(camera,shader);
-  renderer.coefficientsxyz(funmat);
+  //let renderer=new renderingpipeline(camera,shader);
+  //renderer.coefficientsxyz(funmat);
+
+  /*canvas.width 
+  canvas.height*/
+  let canvas=mainCanvas;
+
+  
+  let [textures,resolutions]=createFloatTexture(gl,canvas.width,canvas.height);
+  let framebuffers=[];
+  for(let level=0;level<resolutions.length-1;level++){
+    
+
+    let fb=gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D, textures[0], level);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1,gl.TEXTURE_2D, textures[1], level);
+    gl.drawBuffers([
+      gl.COLOR_ATTACHMENT0,
+      gl.COLOR_ATTACHMENT1, 
+    ]);    
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    framebuffers.push({
+      targetresolution:resolutions[level],
+      startresolution:resolutions[level+1],
+      targetlevel:level,
+      startlevel:level+1,
+      framebuffer:fb
+    });
+  }
+  console.log(framebuffers);
+
+  /*uniform sampler2D roots01tex;
+uniform sampler2D roots23tex;
+uniform float mipLevel;
+uniform float aspectratio;*/ 
+const vertices = new Float32Array([
+      -1, 1,
+      -1,-1,
+      1, 1,
+      1,-1
+    ]);
+
+    const verticesbuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, verticesbuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+    const positionAttribLocation =0;
+    gl.vertexAttribPointer(positionAttribLocation, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(positionAttribLocation);
+
+
+  let upscaleshader=new Shader(gl, vertexShaderSource,await load("./frag_upscaleshader.glsl"));
+  upscaleshader.use();
+  gl.uniform1f(upscaleshader.getUniformLocation("aspectratio"),canvas.width/canvas.height);
+
+  gl.activeTexture(gl.TEXTURE0); // Activate texture unit 0
+  gl.uniform1i( upscaleshader.getUniformLocation( "roots01tex"),textures[0]); // Bind your texture
+  gl.activeTexture(gl.TEXTURE1); // Activate texture unit 1
+  gl.uniform1i( upscaleshader.getUniformLocation( "roots23tex"),textures[1]); // Bind second texture
 
 
   
-  
-  
 
   
-  //setup glsl
+  let upscaledtocolor=new Shader(gl, vertexShaderSource,await load("./frag_upscaledtocolor.glsl"));
+  upscaledtocolor.use();
+  gl.uniform1f(upscaledtocolor.getUniformLocation("aspectratio"),canvas.width/canvas.height);
+  gl.activeTexture(gl.TEXTURE0); // Activate texture unit 0
+  gl.uniform1i( upscaledtocolor.getUniformLocation( "roots01tex"),textures[0]); // Bind second texture // Bind your texture
+  gl.activeTexture(gl.TEXTURE1); // Activate texture unit 1
+  gl.uniform1i( upscaledtocolor.getUniformLocation( "roots23tex"),textures[1]); // Bind second texture // Bind second texture
+  
 
+  let lastlevel=framebuffers.length-1;
+
+  function render(){
+  upscaleshader.use();
+  camera.upadeuniforms(upscaleshader);
+
+  for(let fb of framebuffers){
+      /*targetresolution:resolutions[level],
+      startresolution:resolutions[level+1],
+      targetlevel:level,
+      startlevel:level+1,
+      framebuffer:fb*/
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb.fb);
+      gl.viewport(0, 0, fb.targetresolution[0], fb.targetresolution[1]);
+      gl.uniform2fv(upscaleshader.getUniformLocation('windowsize'), fb.targetresolution);
+      gl.uniform1f(upscaleshader.getUniformLocation('mipLevel'), fb.startlevel);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+
+  }
+
+  upscaledtocolor.use();
+  camera.upadeuniforms(upscaledtocolor);
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, canvas.width,canvas.height);
+  gl.uniform2fv(upscaledtocolor.getUniformLocation('windowsize'), [canvas.width,canvas.height]);
+  gl.uniform1f(upscaledtocolor.getUniformLocation('mipLevel'), lastlevel);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
 
 
  
@@ -491,7 +630,7 @@ async function main(){
 
 
   
-  //main programm
+  //main program
   let deltatimeavg=0
   let lastTime = 0;
   function animate(timestamp){
@@ -508,7 +647,9 @@ async function main(){
       deltatimeavg=deltatimeavg*0.95+deltatime*0.05;
       fpscounter.innerText = `FPS: ${Math.ceil(1/deltatimeavg)}`;
 
-      renderer.render();
+
+      render();
+      //renderer.render();
       
     }
     requestAnimationFrame(animate);
