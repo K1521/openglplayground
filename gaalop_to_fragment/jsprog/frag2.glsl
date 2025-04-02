@@ -193,7 +193,7 @@ float raymarch(vec3 rayDir, inout vec3 rayOrigin) {
         //x += -2. * res[0] * res[1] / (2. * res[1] * res[1] - res[0] * res[2]);
 
         //x += min(4, (f / length(res.xyz))*sign(dot(res.xyz,rayDir)));
-        x -= res.w / dot(res.xyz,rayDir);
+        x -= res.w / (dot(res.xyz,rayDir));
 
     }*/
 
