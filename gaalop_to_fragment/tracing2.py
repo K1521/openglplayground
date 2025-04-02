@@ -50,10 +50,7 @@ def remove_rows_by_rank(matrix):
     return m
     
 def remove_rows_by_rankQR(matrix):
-    # QR decomposition gives us the row space and rank of the matrix
-    Q, R = np.linalg.qr(matrix)  # Perform QR decomposition
-    print(Q)
-    print(R)
+    Q, R = np.linalg.qr(matrix)
     rank = np.linalg.matrix_rank(R)  # The rank is the number of non-zero rows in R
     independent_rows = R[:rank, :]
     return independent_rows

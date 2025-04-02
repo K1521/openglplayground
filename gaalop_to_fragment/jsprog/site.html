@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Geometric Algebra</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <style>
     body, html {
       margin: 0;
@@ -28,24 +29,133 @@
       padding: 5px;
       border-radius: 5px;
     }
+    #diagramPanel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 400px;
+      height: 300px;
+      background-color: rgba(0, 0, 0, 0.7);
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    #plotlyDiagram {
+      width: 100%;
+      height: 100%;
+      /*background-color: white;*/
+      /*border-radius: 5px;*/
+    }
   </style>
 </head>
 <body>
-  <canvas id="myCanvas"></canvas>
+  <canvas id="mainCanvas"></canvas>
   <div id="fpsCounter">FPS: 0</div>
 
+  <div id="diagramPanel">
+    <div id="plotlyDiagram"></div>
+  </div>
   <script type="module">
-import { Vector, Matrix } from './linalg1.js';
+
+
+import { Vector, Matrix, Multidual } from './linalg1.js';
 
 const fpscounter=document.getElementById('fpsCounter')
-const canvas = document.getElementById('myCanvas');
-const gl = canvas.getContext('webgl2');
+const mainCanvas = document.getElementById('mainCanvas');
+const diagramCanvas = document.getElementById('diagramCanvas');
+const gl = mainCanvas.getContext('webgl2',{preserveDrawingBuffer: true});//preserveDrawingBuffer for color picking
 //console.log(gl);
 if (!gl) {
   alert("WebGL not supported!");
 }
 
 
+const xValues = [];
+let yValues = [];
+for (let x = 0; x <= 20; x += 0.01) {
+  xValues.push(x);
+  yValues.push(0);
+}
+const traces = [{
+  x: xValues,
+  y: yValues,
+  mode: 'lines',
+  name: 'f(x)',
+  line: { color: 'blue' }
+}];
+Plotly.newPlot('plotlyDiagram',traces , { title: 'f' ,margin:{l:40,r:20,b:40,t:40}});
+
+
+function DualSummofsquares(rayDir, rayOrigin,coefficients){
+
+    //Multidual(f,dx,dy,dz,d1,d2,d3);
+    const x=new Multidual(rayOrigin.x(),1,0,0,rayDir.x(),0,0);
+    const y=new Multidual(rayOrigin.y(),0,1,0,rayDir.y(),0,0);
+    const z=new Multidual(rayOrigin.z(),0,0,1,rayDir.z(),0,0);
+    
+    const xx=x.square();
+    const yy=y.square();
+    const zz=z.square();
+
+    const r=xx.add(yy).add(zz);
+    const rp=(r.add(1)).mul(0.5);
+    const rm=(r.add(-1)).mul(0.5);
+
+    const xy=x.mul(y);
+    const yz=y.mul(z);
+    const zx=z.mul(x);
+
+    const xrp=x.mul(rp);
+    const xrm=x.mul(rm);
+    const yrp=y.mul(rp);
+    const yrm=y.mul(rm);
+    const zrp=z.mul(rp);
+    const zrm=z.mul(rm);
+
+    const rprp=rp.mul(rp);
+    const rmrm=rm.mul(rm);
+    const rprm=rp.mul(rm);
+
+    const terms = [
+      xx, xy, zx, xrm, xrp,
+      yy, yz, yrm, yrp,
+      zz, zrm, zrp,
+      rmrm, rprm, rprp
+    ];
+
+    let sum=new Multidual(0,0,0,0,0,0,0);
+    for(let j=0;j<coefficients.length;j++){
+
+        let blade = new Multidual(0,0,0,0,0,0,0); // Start with first term
+        for (let i = 0; i < terms.length; i++) {
+          blade = blade.add(terms[i].mul(coefficients[j][i]));
+        }
+
+        sum=sum.add(blade.square());
+    }
+    return (sum);
+
+    //[x**2, x*y, x*z, rm*x, rp*x, y**2, y*z, rm*y, rp*y, z**2, rm*z, rp*z, rm**2, rm*rp, rp**2]
+}
+function drawplot(camera,coefficients){
+  const raydir=camera.c2w.mul(new Vector([0,0,1]));
+  for(let i=0;i<xValues.length;i++){
+
+    const res=DualSummofsquares(raydir,camera.cameraPos.add(raydir.mul(xValues[i])),coefficients);
+    //let x=new Multidual(-0.001,0,0,0,1,0,0);
+    //let xx=x.square().sqrt();
+    //let xxx=xx;//xx.mul(xx).mul(xx);
+    //yValues[i]=xxx.d3;
+    //console.log(`${xxx.f} ${xxx.d1} ${xxx.d2} ${xxx.d3}`);
+    yValues[i]=Math.sqrt(res.f);//ganja
+    //yValues[i]=res.f/Math.sqrt(res.dx*res.dx+res.dy*res.dy,res.dz*res.dz);//newton2
+    //yValues[i]=res.f/res.d1;//newton1
+    //yValues[i]=-2*res.f*res.d1/(2*res.d1*res.d1-res.f*res.d2);
+    //yValues[i]=-2*res.f*res.d1/(res.d1*(1+Math.sqrt((1-2*res.f*res.d2/(res.d1*res.d1)))));
+    //console.log(yValues[i]);
+  }
+  Plotly.redraw('plotlyDiagram');
+}
 
 const vertexShaderSource = `#version 300 es
   in vec4 a_position;
@@ -54,10 +164,10 @@ const vertexShaderSource = `#version 300 es
   }
 `;
 
-async function loadShader(url) {
+async function load(url) {
   const response = await fetch(url);
   if (!response.ok) {
-    console.error('Failed to load shader:', url);
+    console.error('Failed to load:', url);
     return '';
   }
   return await response.text();
@@ -66,28 +176,62 @@ async function loadShader(url) {
 
 //console.log(fragmentShaderSource);
 
-function compileShader(gl, source, type) {
-  const shader = gl.createShader(type);
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    console.error("Shader compile failed:", gl.getShaderInfoLog(shader));
+class Shader{
+  constructor(gl,vertexShaderSource,fragmentShaderSource){
+    this.programm=Shader.createProgram(gl, vertexShaderSource,fragmentShaderSource );
+    this.gl=gl;
+    this.attributelocations=new Map();
+    this.uniformlocations=new Map();
   }
-  return shader;
+
+  use(){
+    this.gl.useProgram(this.programm);
+  }
+
+  getUniformLocation(name){
+    var loc=this.uniformlocations.get(name);
+    if(loc==undefined){
+      loc=this.gl.getUniformLocation(this.programm,name);
+      this.uniformlocations.set(name,loc);
+    }
+    return loc;
+  }
+  getAttribLocation(name){
+    var loc=this.attributelocations.get(name);
+    if(loc==undefined){
+      loc=this.gl.getAttribLocation(this.programm,name);
+      this.attributelocations.set(name,loc);
+    }
+    return loc;
+  }
+  
+
+  static compileShader(gl, source, type) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      console.error("Shader compile failed:", gl.getShaderInfoLog(shader));
+      alert(gl.getShaderInfoLog(shader));
+    }
+    return shader;
+  }
+
+  static createProgram(gl, vertexShaderSource, fragmentShaderSource) {
+    const vertexShader = Shader.compileShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
+    const fragmentShader = Shader.compileShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error("Program link failed:", gl.getProgramInfoLog(program));
+    }
+    return program;
+  }
 }
 
-function createProgram(gl, vertexShaderSource, fragmentShaderSource) {
-  const vertexShader = compileShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
-  const fragmentShader = compileShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
-  const program = gl.createProgram();
-  gl.attachShader(program, vertexShader);
-  gl.attachShader(program, fragmentShader);
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.error("Program link failed:", gl.getProgramInfoLog(program));
-  }
-  return program;
-}
+
 
 function radians(x){return x*Math.PI/180;}
 
@@ -95,325 +239,276 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+class Cameracontroll{
+  constructor(canvas){
+    this.canvas=canvas;
+    this.colorpicker=true;
+    this.c2w=Matrix.eye(3);
+    this.cameraPos = new Vector([0,0,0]);
+    this.mouse = {
+      x: undefined,
+      y: undefined,
+      left: false,  
+      right: false, 
+      middle: false
+    };
+    this.keysPressed = {
+      w: false,
+      a: false,
+      s: false,
+      d: false,
+      q: false,
+      e: false,
+      shift: false,
+      space: false
+    };
+    this.changed=true;
+    // Bind event listener functions to maintain 'this' context
+    this.mousemove = this.mousemove.bind(this);
+    this.mousedown = this.mousedown.bind(this);
+    this.mouseup = this.mouseup.bind(this);
+    this.keydown = this.keydown.bind(this);
+    this.keyup = this.keyup.bind(this);
 
-
-async function main(){
-  const fragmentShaderSource =await loadShader("./frag2_aberth.glsl"); 
-  //const fragmentShaderSource =await loadShader("./frag2.glsl"); 
-  //const fragmentShaderSource =await loadShader("./smallraytracer.glsl"); 
-  //console.log(fragmentShaderSource);
-
-  const shaderProgram = createProgram(gl, vertexShaderSource,fragmentShaderSource );
-  gl.useProgram(shaderProgram);
-  
-  let funmat=new Matrix([[-3.2,0., 0., 0., 0.,-3.2,0., 0., 0., 0., 0., 0., 1.5125, -5.225,   4.5125]]);
-  /*let funmat=new Matrix(
-  [[ 6.38346350e+01, -1.90184568e+01,  7.95845390e-01,  1.47620028e+01,
-    -2.49565901e+01,  4.78965103e+00, -3.80369137e+01,  6.47239798e+00,
-    -3.70561600e+01,  7.95845390e-01,  2.95240055e+01, -4.99131802e+01,
-    -3.15698523e+00,  3.09911696e+01, -4.37431028e+01],
-   [ 0.00000000e+00, -7.24287291e+01, -4.78654091e+01, -3.66598314e+01,
-     3.07586249e+01, -8.55303591e+00, -3.79739039e+01, -1.11788575e+01,
-    -6.52476210e+00, -1.22375577e+01, -6.66605608e+00, -5.13635700e+00,
-    -5.39356437e+00,  1.40973864e+01, -1.39221508e+01],
-   [ 0.00000000e+00,  0.00000000e+00, -9.55611004e+00,  8.47019551e-01,
-    -7.96406827e+00,  6.37747836e+00, -2.10153561e+01,  9.69976036e+00,
-    -3.10509065e+01, -1.65612287e+01, -1.14113380e+01, -2.82275947e+00,
-     3.51531040e+00, -1.99069481e+01,  1.62322008e+01],
-   [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00, -1.19896348e+01,
-     2.07093692e+01,  2.53883068e+01,  3.04659682e+01, -7.47060068e+00,
-     3.36298039e+01,  1.01553227e+01, -4.98040045e+00,  2.24198693e+01,
-    -1.47446396e+01,  4.75478547e+01, -3.34379227e+01],
-   [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  0.00000000e+00,
-    -1.16139214e-14,  7.66449089e+00,  9.19738907e+00,  8.60336969e+00,
-    -8.60336969e+00,  3.06579636e+00,  5.73557979e+00, -5.73557979e+00,
-     2.32030486e+00, -4.11367597e+00,  1.60175884e+00]]);*/
-  /*let funmat=new Matrix([[ -33.4375    ,  135.375     ,   90.25      ,   35.54574517,
-           0.        ,  147.0625    ,  270.75      ,  106.63723552,
-           0.        ,   90.25      ,   71.09149035,    0.        ,
-          14.        ,    0.        ,    0.        ],
-       [ -42.9375    ,   78.375     ,   52.25      ,   10.28955781,
-          17.77287259,   61.5625    ,  156.75      ,   30.86867344,
-          53.31861776,   52.25      ,   20.57911563,   35.54574517,
-           0.        ,   14.        ,    0.        ],
-       [ -42.9375    ,   78.375     ,   52.25      ,   10.28955781,
-          17.77287259,   61.5625    ,  156.75      ,   30.86867344,
-          53.31861776,   52.25      ,   20.57911563,   35.54574517,
-           0.        ,   14.        ,    0.        ],
-       [ -48.4375    ,   45.375     ,   30.25      ,    0.        ,
-          20.57911563,   12.0625    ,   90.75      ,    0.        ,
-          61.73734688,   30.25      ,    0.        ,   41.15823125,
-           0.        ,    0.        ,   14.        ],
-       [-160.        ,    0.        ,  -64.        ,  -59.86651819,
-          59.86651819,    0.        ,    0.        ,    0.        ,
-           0.        ,  -64.        , -119.73303638,  119.73303638,
-          12.0625    , -123.125     ,  147.0625    ],
-       [ -96.        ,   32.        ,    0.        ,    0.        ,
-           0.        ,    0.        ,   64.        ,   59.86651819,
-         -59.86651819,    0.        ,    0.        ,    0.        ,
-          45.375     , -156.75      ,  135.375     ],
-       [ -89.79977728,   29.93325909,    0.        ,  -22.6875    ,
-          39.1875    ,    0.        ,   59.86651819,  -12.0625    ,
-          61.5625    ,    0.        ,  -45.375     ,   78.375     ,
-           0.        ,  -30.86867344,   53.31861776],
-       [ -89.79977728,   29.93325909,    0.        ,  -39.1875    ,
-          67.6875    ,    0.        ,   59.86651819,  -61.5625    ,
-         147.0625    ,    0.        ,  -78.375     ,  135.375     ,
-         -30.86867344,   53.31861776,    0.        ],
-       [ -96.        ,   32.        ,    0.        ,    0.        ,
-           0.        ,    0.        ,   64.        ,   59.86651819,
-         -59.86651819,    0.        ,    0.        ,    0.        ,
-          45.375     , -156.75      ,  135.375     ],
-       [ -64.        ,    0.        ,    0.        ,    0.        ,
-           0.        ,  -64.        ,    0.        ,    0.        ,
-           0.        ,    0.        ,    0.        ,    0.        ,
-          30.25      , -104.5       ,   90.25      ],
-       [ -59.86651819,    0.        ,    0.        ,  -15.125     ,
-          26.125     ,  -59.86651819,    0.        ,  -45.375     ,
-          78.375     ,    0.        ,  -30.25      ,   52.25      ,
-           0.        ,  -20.57911563,   35.54574517],
-       [ -59.86651819,    0.        ,    0.        ,  -26.125     ,
-          45.125     ,  -59.86651819,    0.        ,  -78.375     ,
-         135.375     ,    0.        ,  -52.25      ,   90.25      ,
-         -20.57911563,   35.54574517,    0.        ],
-       [ -89.79977728,   29.93325909,    0.        ,  -22.6875    ,
-          39.1875    ,    0.        ,   59.86651819,  -12.0625    ,
-          61.5625    ,    0.        ,  -45.375     ,   78.375     ,
-           0.        ,  -30.86867344,   53.31861776],
-       [ -59.86651819,    0.        ,    0.        ,  -15.125     ,
-          26.125     ,  -59.86651819,    0.        ,  -45.375     ,
-          78.375     ,    0.        ,  -30.25      ,   52.25      ,
-           0.        ,  -20.57911563,   35.54574517],
-       [ -89.79977728,   29.93325909,    0.        ,  -39.1875    ,
-          67.6875    ,    0.        ,   59.86651819,  -61.5625    ,
-         147.0625    ,    0.        ,  -78.375     ,  135.375     ,
-         -30.86867344,   53.31861776,    0.        ],
-       [ -59.86651819,    0.        ,    0.        ,  -26.125     ,
-          45.125     ,  -59.86651819,    0.        ,  -78.375     ,
-         135.375     ,    0.        ,  -52.25      ,   90.25      ,
-         -20.57911563,   35.54574517,    0.        ],
-       [   0.        ,  160.        ,   96.        ,   89.79977728,
-         -89.79977728,    0.        ,   32.        ,   29.93325909,
-         -29.93325909,    0.        ,    0.        ,    0.        ,
-          22.6875    ,  -78.375     ,   67.6875    ],
-       [   0.        ,   96.        ,   64.        ,   59.86651819,
-         -59.86651819,  -32.        ,    0.        ,    0.        ,
-           0.        ,    0.        ,    0.        ,    0.        ,
-          15.125     ,  -52.25      ,   45.125     ],
-       [   0.        ,   89.79977728,   59.86651819,   48.4375    ,
-         -42.9375    ,  -29.93325909,    0.        ,  -22.6875    ,
-          39.1875    ,    0.        ,  -15.125     ,   26.125     ,
-           0.        ,  -10.28955781,   17.77287259],
-       [   0.        ,   89.79977728,   59.86651819,   42.9375    ,
-         -33.4375    ,  -29.93325909,    0.        ,  -39.1875    ,
-          67.6875    ,    0.        ,  -26.125     ,   45.125     ,
-         -10.28955781,   17.77287259,    0.        ],
-       [   0.        ,  160.        ,   96.        ,   89.79977728,
-         -89.79977728,    0.        ,   32.        ,   29.93325909,
-         -29.93325909,    0.        ,    0.        ,    0.        ,
-          22.6875    ,  -78.375     ,   67.6875    ],
-       [   0.        ,   96.        ,   64.        ,   59.86651819,
-         -59.86651819,  -32.        ,    0.        ,    0.        ,
-           0.        ,    0.        ,    0.        ,    0.        ,
-          15.125     ,  -52.25      ,   45.125     ],
-       [   0.        ,   89.79977728,   59.86651819,   48.4375    ,
-         -42.9375    ,  -29.93325909,    0.        ,  -22.6875    ,
-          39.1875    ,    0.        ,  -15.125     ,   26.125     ,
-           0.        ,  -10.28955781,   17.77287259],
-       [   0.        ,   89.79977728,   59.86651819,   42.9375    ,
-         -33.4375    ,  -29.93325909,    0.        ,  -39.1875    ,
-          67.6875    ,    0.        ,  -26.125     ,   45.125     ,
-         -10.28955781,   17.77287259,    0.        ],
-       [   0.        ,    0.        ,    0.        ,    0.        ,
-           0.        , -160.        , -192.        , -179.59955457,
-         179.59955457,  -64.        , -119.73303638,  119.73303638,
-         -48.4375    ,   85.875     ,  -33.4375    ]]);*/
-  for(let i=0;i<funmat.size()[0];i++)
-    for(let j=0;j<funmat.size()[1];j++){
-      let location = gl.getUniformLocation(shaderProgram,`coefficientsxyz[${i*15+j}]`);
-      console.log(location);
-      gl.uniform1f(location, funmat.array[i][j]);
-    }
-
-  //draw rect
-
-  const vertices = new Float32Array([
-    -1, 1,
-    -1,-1,
-    1, 1,
-    1,-1
-  ]);
-
-  const buffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-
-  const positionAttribLocation = gl.getAttribLocation(shaderProgram, "a_position");
-  gl.vertexAttribPointer(positionAttribLocation, 2, gl.FLOAT, false, 0, 0);
-  gl.enableVertexAttribArray(positionAttribLocation);
-
-
-  const cameraPosLocation = gl.getUniformLocation(shaderProgram, 'cameraPos');
-  let cameraPos = new Vector([0,0,0]);
-  gl.uniform3fv(cameraPosLocation, cameraPos.array);
-
-  const windowsizeLocation = gl.getUniformLocation(shaderProgram, 'windowsize');
-  canvas.width=canvas.clientWidth;
-  canvas.height=canvas.clientHeight;
-  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-  const windowsize = [canvas.width, canvas.height];
-  gl.uniform2fv(windowsizeLocation, windowsize);
-
-  let c2w=Matrix.eye(3);
-  //const rotr1=Matrix.rotationMatrix(new Vector([0,1,0]),radians(1));
-
-  let canvasupdate=true;
-
-  let mouse = {
-    x: undefined,
-    y: undefined,
-    left: false,  
-    right: false, 
-    middle: false
-  };
-
-  // Update mouse position and button state on mouse events
-  window.addEventListener('mousemove', (event) => {
-    const rect = canvas.getBoundingClientRect();
+    this.initeventlisteners()
+  }
+  mousemove(event){
+    const rect = this.canvas.getBoundingClientRect();
     const xcord=event.clientX - rect.left;
     const ycord=event.clientY - rect.top;
     //const dx=xcord-mouse.x;
     //const dy=event.clientY-mouse.y;
-    if(mouse.x===undefined){
-      mouse.x=xcord;
-      mouse.y=ycord;
+    if(this.mouse.x===undefined){
+      this.mouse.x=xcord;
+      this.mouse.y=ycord;
     }
 
-    if(mouse.left){
+    if(this.mouse.left){
       
-      const deltax=rect.right-rect.left;
-      const deltay=rect.bottom-rect.top;
+      const width=rect.right-rect.left;
+      const height=rect.bottom-rect.top;
       const fovfactor=1/Math.tan(radians(120)/2);
       
-      const u= c=>(2.0*c-deltax)/deltax;//cords between [-1,1]
-      const v= c=>(2.0*c-deltay)/deltax;
-      const uangle=(Math.atan(u(xcord)/fovfactor)-Math.atan(u(mouse.x)/fovfactor));
-      const vangle=(Math.atan(v(ycord)/fovfactor)-Math.atan(v(mouse.y)/fovfactor));
+      const u= c=>(2.0*c-width)/width;//cords between [-1,1]
+      const v= c=>(2.0*c-height)/width;
+      const uangle=(Math.atan(u(xcord)/fovfactor)-Math.atan(u(this.mouse.x)/fovfactor));
+      const vangle=(Math.atan(v(ycord)/fovfactor)-Math.atan(v(this.mouse.y)/fovfactor));
 
 
-      c2w=Matrix.rotationMatrix(new Vector([0,1,0]),uangle).mul(
-          Matrix.rotationMatrix(new Vector([1,0,0]),vangle)).mul(
-          c2w);
-      canvasupdate=true;
+      this.c2w=this.c2w.mul(Matrix.rotationMatrix(new Vector([0,-1,0]),uangle).mul(
+          Matrix.rotationMatrix(new Vector([-1,0,0]),vangle)));
+      this.changed=true;
     }
 
+    this.mouse.x = xcord;
+    this.mouse.y = ycord;
+  }
 
-
-
-    mouse.x = xcord;
-    mouse.y = ycord;
-  });
-
-  canvas.addEventListener('mousedown', (event) => {
+  mousedown(event){
     // Update mouse button states
-    if (event.button === 0) mouse.left = true;    // Left button
-    if (event.button === 1) mouse.middle = true;  // Middle button
-    if (event.button === 2) mouse.right = true;   // Right button
-  });
+    if (event.button === 0) this.mouse.left = true;    // Left button
+    if (event.button === 1) this.mouse.middle = true;  // Middle button
+    if (event.button === 2) this.mouse.right = true;   // Right button
 
-  window.addEventListener('mouseup', (event) => {
+    if(this.colorpicker){
+      const x = event.clientX;
+      const y = this.canvas.height - event.clientY; // Flip Y since WebGL has (0,0) at bottom-left
+      const pixels = new Uint8Array(4); // RGBA
+      gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      const color = `rgb(${(pixels[0]/255).toFixed(3)}, ${(pixels[1]/255).toFixed(3)}, ${(pixels[2]/255).toFixed(3)}, ${(pixels[3]/255).toFixed(3)})    rgb(${pixels[0]}, ${pixels[1]}, ${pixels[2]}, ${pixels[3]})    (${pixels[0]-128}, ${pixels[1]-128}, ${pixels[2]-128}, ${pixels[3]-128})`;
+      console.log(color); // Display the color in console or UI
+    }
+  }
+
+  mouseup(event){
     // Update mouse button states
-    if (event.button === 0) mouse.left = false;
-    if (event.button === 1) mouse.middle = false;
-    if (event.button === 2) mouse.right = false;
-  });
+    if (event.button === 0) this.mouse.left = false;
+    if (event.button === 1) this.mouse.middle = false;
+    if (event.button === 2) this.mouse.right = false;
+  }
 
-
-  const keysPressed = {
-    w: false,
-    a: false,
-    s: false,
-    d: false,
-    shift: false,
-    space: false
-  };
-
-  // Handle keydown event
-  window.addEventListener('keydown', (event) => {
-    if (event.key === 'w' || event.key === 'W') {
-      keysPressed.w = true;
-    } else if (event.key === 'a' || event.key === 'A') {
-      keysPressed.a = true;
-    } else if (event.key === 's' || event.key === 'S') {
-      keysPressed.s = true;
-    } else if (event.key === 'd' || event.key === 'D') {
-      keysPressed.d = true;
-    } else if (event.key === 'Shift') {
-      keysPressed.shift = true;
-    } else if (event.key === ' ') {  // Space key
-      keysPressed.space = true;
+  keydown(event){
+    if (event.key === ' ') {  // Space key
+      this.keysPressed.space = true;
+    }else{
+      this.keysPressed[event.key.toLowerCase()]=true;
     }
-    
-  });
+  }
 
-  // Handle keyup event
-  window.addEventListener('keyup', (event) => {
-    if (event.key === 'w' || event.key === 'W') {
-      keysPressed.w = false;
-    } else if (event.key === 'a' || event.key === 'A') {
-      keysPressed.a = false;
-    } else if (event.key === 's' || event.key === 'S') {
-      keysPressed.s = false;
-    } else if (event.key === 'd' || event.key === 'D') {
-      keysPressed.d = false;
-    } else if (event.key === 'Shift') {
-      keysPressed.shift = false;
-    } else if (event.key === ' ') {  // Space key
-      keysPressed.space = false;
+  keyup(event){
+    if (event.key === ' ') {  // Space key
+      this.keysPressed.space = false;
+    }else{
+      this.keysPressed[event.key.toLowerCase()]=false;
     }
-  });
+  }
+
+  initeventlisteners(){
+    window.addEventListener('mousemove', this.mousemove);
+    this.canvas.addEventListener('mousedown', this.mousedown);//uses canvas because moving on other elements shouldnt influence the camera
+    window.addEventListener('mouseup', this.mouseup);
+    window.addEventListener('keydown',this.keydown);
+    window.addEventListener('keyup',this.keyup);
+  }
+  update(deltatime){
+    this.c2w=this.c2w.orthogonalize();//orthogonalize only against precision errors. probably unnessesary
+    let movementfactor=deltatime;
+    let deltapos=new Vector([0,0,0]);
+    if(this.keysPressed.shift)movementfactor/=10;
+    if(this.keysPressed.space)movementfactor*=5;
+    if(this.keysPressed.a)deltapos=deltapos.add(new Vector([-1,0,0]));
+    if(this.keysPressed.d)deltapos=deltapos.add(new Vector([1,0,0]));
+    if(this.keysPressed.s)deltapos=deltapos.add(new Vector([0,0,-1]));
+    if(this.keysPressed.w)deltapos=deltapos.add(new Vector([0,0,1]));
+    if(this.keysPressed.q){
+      this.c2w=this.c2w.mul(Matrix.rotationMatrix(new Vector([0,1,0]),radians(-movementfactor*30)));
+      this.changed=true;
+    };
+    if(this.keysPressed.e){
+      this.c2w=this.c2w.mul(Matrix.rotationMatrix(new Vector([0,1,0]),radians(movementfactor*30)));
+      this.changed=true;
+    };
+    deltapos=deltapos.mul(movementfactor*4);
+    if(deltapos.abs()>0){
+      this.changed=true;
+      this.cameraPos = this.cameraPos.add(this.c2w.mul(deltapos));
+    }
+  }
+  upadeuniforms(shader){
+    const cameraPosLocation = shader.getUniformLocation('cameraPos');
+    shader.gl.uniform3fv(cameraPosLocation, this.cameraPos.array);
+    const c2wLocation = shader.getUniformLocation("cameraMatrix");
+    shader.gl.uniformMatrix3fv(c2wLocation, true, new Float32Array(this.c2w.array.flat()));
+  }
+}
+
+class renderingpipeline{
+  constructor(cameracontroll,shader){
+    this.camera=cameracontroll;
+    this.shader=shader;
+    this.funmatbuffer=undefined;//this is here so i dont forget it
+    this.verticesbuffer=undefined;
+    this.makeVerticesbuffer();
+    this.resizeCanvas=this.resizeCanvas.bind(this)
+
+    this.resizeCanvas();
+    window.addEventListener("resize", this.resizeCanvas);
+
+  }
+  render(){
+    this.camera.upadeuniforms(this.shader);
+    //gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    //gl.clear(gl.COLOR_BUFFER_BIT);
+    this.shader.gl.drawArrays(this.shader.gl.TRIANGLE_STRIP, 0, 4);
+    this.camera.changed=false;
+  }
+  resizeCanvas() {
+    const canvas=this.camera.canvas;
+    const windowsizeLocation = this.shader.getUniformLocation('windowsize');
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.clientWidth * dpr;
+    canvas.height = canvas.clientHeight * dpr;
+    this.shader.gl.viewport(0, 0, canvas.width, canvas.height);
+    const windowsize = [canvas.width, canvas.height];
+    this.shader.gl.uniform2fv(windowsizeLocation, windowsize);
+    this.camera.changed=true;
+  }
+  coefficientsxyz(funmat){
+    for(let i=0;i<funmat.size()[0];i++)
+    for(let j=0;j<funmat.size()[1];j++){
+      this.shader.gl.uniform1f(this.shader.getUniformLocation(`coefficientsxyz[${i*15+j}]`), funmat.array[i][j]);
+    }
+  }
+  coefficientsxyzbuffer(funmat){
+    let gl=this.shader.gl;
+    gl.bindBuffer(gl.UNIFORM_BUFFER, ubo);
+    gl.bufferData(gl.UNIFORM_BUFFER, new Float32Array(funmat.array.flat().map(x=>[x,0,0,0]).flat()), gl.STATIC_DRAW);
+  }
+  makeCoefficientsxyzBuffer(funmat){
+    let gl=this.shader.gl;
+    const ubo = gl.createBuffer();
+    gl.bindBuffer(gl.UNIFORM_BUFFER, ubo);
+    const blockIndex = gl.getUniformBlockIndex(this.shader.programm, "MyUBO");
+    // Bind the UBO to a binding point (0 in this case)
+    gl.uniformBlockBinding(shader.programm, blockIndex, 0);
+    // Bind the UBO to the uniform binding point (0)
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, ubo);
+    this.funmatbuffer=ubo;
+  }
+  makeVerticesbuffer(){
+    let gl=this.shader.gl;
+    const vertices = new Float32Array([
+      -1, 1,
+      -1,-1,
+      1, 1,
+      1,-1
+    ]);
+
+    const verticesbuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, verticesbuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+    const positionAttribLocation =this.shader.getAttribLocation("a_position");
+    gl.vertexAttribPointer(positionAttribLocation, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(positionAttribLocation);
+    this.verticesbuffer=verticesbuffer;
+  }
+
+
+
+}
+
+
+async function main(){
+  const fragmentShaderSource =await load("./frag3.glsl"); 
+  //const fragmentShaderSource =await load("./frag_aberth.glsl"); 
+  //console.log(fragmentShaderSource);
+
+  const shader =new Shader(gl, vertexShaderSource,fragmentShaderSource );
+  shader.use();
+  const camera=new Cameracontroll(mainCanvas);
+  
+  let funmat=new Matrix([[-3.2,0., 0., 0., 0.,-3.2,0., 0., 0., 0., 0., 0., 1.5125, -5.225,   4.5125]]);
+  /**/
+  let renderer=new renderingpipeline(camera,shader);
+  renderer.coefficientsxyz(funmat);
+
 
   
+  
+  
+
+  
+  //setup glsl
+
+
+
+ 
+
+  
+  
+  
+
+
+  
+  //main programm
   let deltatimeavg=0
   let lastTime = 0;
   function animate(timestamp){
     let deltatime = (timestamp - lastTime) / 1000; // Convert to seconds
     lastTime = timestamp;
-
-    //c2w=c2w.mul(rotr1).orthogonalize();//orthogonalize only against precision errors. probably unnessesary
-    let movementfactor=deltatime*4;
-    let deltapos=new Vector([0,0,0]);
-    if(keysPressed.shift)movementfactor/=10;
-    if(keysPressed.space)movementfactor*=5;
-    if(keysPressed.a)deltapos=deltapos.add(new Vector([-1,0,0]));
-    if(keysPressed.d)deltapos=deltapos.add(new Vector([1,0,0]));
-    if(keysPressed.s)deltapos=deltapos.add(new Vector([0,0,-1]));
-    if(keysPressed.w)deltapos=deltapos.add(new Vector([0,0,1]));
-    deltapos=deltapos.mul(movementfactor);
-    if(deltapos.abs()>0){
-      canvasupdate=true;
-      cameraPos = cameraPos.add(c2w.transpose().mul(deltapos));
-      gl.uniform3fv(cameraPosLocation, cameraPos.array);
-    }
+    
 
     
-    if(canvasupdate){
-      gl.finish();
-      
-      const c2wLocation = gl.getUniformLocation(shaderProgram, "cameraMatrix");
-      gl.uniformMatrix3fv(c2wLocation, false, new Float32Array(c2w.array.flat()));
 
-      //gl.clearColor(0.0, 0.0, 0.0, 1.0);
-       
-      gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      gl.flush();
-      canvasupdate=false;
-
-
+    camera.update(deltatime);
+    if(camera.changed){
+      drawplot(camera,funmat.array);
 
       deltatimeavg=deltatimeavg*0.95+deltatime*0.05;
       fpscounter.innerText = `FPS: ${Math.ceil(1/deltatimeavg)}`;
+
+      renderer.render();
       
     }
     requestAnimationFrame(animate);

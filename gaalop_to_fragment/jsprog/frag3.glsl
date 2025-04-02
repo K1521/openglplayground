@@ -9,6 +9,9 @@ const int numpolys=1;
 //const int numpolys=...;
 //const int MAXPOLYDEGREE=...;#line 11 1 //code before this is defined in other file
 uniform float[numpolys*polybasislength] coefficientsxyz;
+/*layout(std140) uniform MyUBO {
+    float[numpolys*polybasislength] coefficientsxyz;
+};*/
 
 //step divided by length of deriv in xyz
 
@@ -65,80 +68,95 @@ float sum(vec3 v) {
 int sum(ivec3 v) {
     return v.x+v.y+v.z;
 }
+float vmax(vec3 v) {
+    return max(max(v.x, v.y), v.z);
+}
 /*bool any(bvec3 b) {
     return b.x || b.y || b.z;
 }*/
 
-#define Dual vec4
+#define Dualxyz vec4
 
-Dual dMul(Dual a,Dual b){
-    return Dual(a.w*b.xyz+b.w*a.xyz,a.w*b.w);
+Dualxyz DualxyzMul(Dualxyz a,Dualxyz b){
+  //  vec3 v = a.w * b.xyz + b.w * a.xyz;
+//return Dualxyz(v.x, v.y, v.z, a.w * b.w);
+//return Dualxyz(a.w*b.x+b.w*a.x,a.w*b.y+b.w*a.y,a.w*b.z+b.w*a.z,a.w*b.w);
+    return Dualxyz(a.w*b.xyz+b.w*a.xyz,a.w*b.w);
 }
-Dual dSqr(Dual a){
-    return Dual(2.*a.w*a.xyz,a.w*a.w);
+Dualxyz DualxyzSqr(Dualxyz a){
+    return Dualxyz(2.*a.w*a.xyz,a.w*a.w);
 }
 
-Dual dSqrt(Dual a){
+Dualxyz DualxyzSqrt(Dualxyz a){
     float sqrtf=sqrt(a.w);
-    return Dual(a.xyz/(2.*sqrtf),sqrtf);
+    return Dualxyz(a.xyz/(2.*sqrtf),sqrtf);
 }
 
-Dual dAbs(Dual a) {
-    return Dual(a.xyz*sign(a.w),abs(a.w));
+Dualxyz DualxyzAbs(Dualxyz a) {
+    return Dualxyz(a.xyz*sign(a.w),abs(a.w));
 }
 
+//
 
 
-Dual summofsquares(vec3 rayDir, vec3 rayOrigin){
-    Dual x=Dual(1.0,0.0,0.0,rayOrigin.x);
-    Dual y=Dual(0.0,1.0,0.0,rayOrigin.y);
-    Dual z=Dual(0.0,0.0,1.0,rayOrigin.z);
+
+
+Dualxyz DualxyzSummofsquares(vec3 rayDir, vec3 rayOrigin){
+    Dualxyz x=Dualxyz(1.0,0.0,0.0,rayOrigin.x);
+    Dualxyz y=Dualxyz(0.0,1.0,0.0,rayOrigin.y);
+    Dualxyz z=Dualxyz(0.0,0.0,1.0,rayOrigin.z);
     
-    Dual xx=dSqr(x);
-    Dual yy=dSqr(y);
-    Dual zz=dSqr(z);
+    Dualxyz xx=DualxyzSqr(x);
+    Dualxyz yy=DualxyzSqr(y);
+    Dualxyz zz=DualxyzSqr(z);
 
-    Dual r=xx+yy+zz;
-    Dual rp=(r+Dual(0.,0.,0.,1.))*0.5;
-    Dual rm=(r-Dual(0.,0.,0.,1.))*0.5;
+    Dualxyz r=xx+yy+zz;
+    Dualxyz rp=(r+Dualxyz(0.,0.,0.,1.))*0.5;
+    Dualxyz rm=(r-Dualxyz(0.,0.,0.,1.))*0.5;
 
-    Dual xy=dMul(x,y);
-    Dual yz=dMul(y,z);
-    Dual zx=dMul(z,x);
+    
+    if(numpolys==1){
 
-    Dual xrp=dMul(x,rp);
-    Dual xrm=dMul(x,rm);
-    Dual yrp=dMul(y,rp);
-    Dual yrm=dMul(y,rm);
-    Dual zrp=dMul(z,rp);
-    Dual zrm=dMul(z,rm);
+        return DualxyzSqr(
+            DualxyzMul(x,x*coefficientsxyz[0]+y*coefficientsxyz[1]+z*coefficientsxyz[2]+rm*coefficientsxyz[3]+rp*coefficientsxyz[4])+
+            DualxyzMul(y,y*coefficientsxyz[5]+z*coefficientsxyz[6]+rm*coefficientsxyz[7]+rp*coefficientsxyz[8])+
+            DualxyzMul(z,z*coefficientsxyz[9]+rm*coefficientsxyz[10]+rp*coefficientsxyz[11])+
+            DualxyzMul(rm,rm*coefficientsxyz[12]+rp*coefficientsxyz[13])+
+            DualxyzSqr(rp)*coefficientsxyz[14]
+        );
+    }
 
-    Dual rprp=dMul(rp,rp);
-    Dual rmrm=dMul(rm,rm);
-    Dual rprm=dMul(rp,rm);
+    Dualxyz basis[15];
+    basis[0] = xx;
+    basis[1] = DualxyzMul(x,y);
+    basis[2] = DualxyzMul(x,z);
+    basis[3] = DualxyzMul(x,rm);
+    basis[4] = DualxyzMul(x,rp);
+    basis[5] = yy;
+    basis[6] = DualxyzMul(y,z);
+    basis[7] = DualxyzMul(y,rm);
+    basis[8] = DualxyzMul(y,rp);
+    basis[9] = zz;
+    basis[10] = DualxyzMul(z,rm);
+    basis[11] = DualxyzMul(z,rp);
+    basis[12] = DualxyzSqr(rm);
+    basis[13] = DualxyzMul(rp,rm);
+    basis[14] = DualxyzSqr(rp);
 
-    Dual sum=Dual(0.);
+    Dualxyz sum=Dualxyz(0.);
     for(int i=0;i<numpolys;i++){
         int index=polybasislength*i;
-        sum+=dSqr(
-            coefficientsxyz[index+0]*xx+
-            coefficientsxyz[index+1]*xy+
-            coefficientsxyz[index+2]*zx+
-            coefficientsxyz[index+3]*xrm+
-            coefficientsxyz[index+4]*xrp+
-            coefficientsxyz[index+5]*yy+
-            coefficientsxyz[index+6]*yz+
-            coefficientsxyz[index+7]*yrm+
-            coefficientsxyz[index+8]*yrp+
-            coefficientsxyz[index+9]*zz+
-            coefficientsxyz[index+10]*zrm+
-            coefficientsxyz[index+11]*zrp+
-            coefficientsxyz[index+12]*rmrm+
-            coefficientsxyz[index+13]*rprm+
-            coefficientsxyz[index+14]*rprp
-            );
+        Dualxyz term = vec4(0.0);
+        
+        // Accumulate the weighted sum
+        for (int j = 0; j < 15; j++) {
+            term += coefficientsxyz[index + j] * basis[j];
+        }
+        
+        // Square and add to sum
+        sum += DualxyzSqr(term);
     }
-    return sum;
+    return (sum);
 
 
     //[x**2, x*y, x*z, rm*x, rp*x, y**2, y*z, rm*y, rp*y, z**2, rm*z, rp*z, rm**2, rm*rp, rp**2]
@@ -148,7 +166,7 @@ Dual summofsquares(vec3 rayDir, vec3 rayOrigin){
 }
 
 
-float raymarch(vec3 rayDir, inout vec3 rayOrigin) {
+float DualxyzRaymarch(vec3 rayDir, inout vec3 rayOrigin) {
     
     float bestx=0.;
     float beste=inf;
@@ -156,13 +174,23 @@ float raymarch(vec3 rayDir, inout vec3 rayOrigin) {
 
     for(int i = 0; i < 60; ++i){
 
-        Dual res = summofsquares(rayDir,rayOrigin+rayDir*x);
-        float f=abs(res.w);
-        float e=f;///sqrt(x+1);
+        Dualxyz res = DualxyzSummofsquares(rayDir,rayOrigin+rayDir*x);
+
+        float e=abs(res.w);///sqrt(x+1);
         if(e < beste){
             beste=e;
             bestx=x;
         }
+
+        float dx= abs(res.w / length(res.xyz))*2.;
+        x+=dx;
+        if(dx<0.0001)break;
+        /*if(dx<0.0001){
+            //debugcolor(vec3(0.,0.,float(i+1)/20.));
+            //debugcolor(vec3(0.,0.,float(i+1)/10.));
+            break;
+        }*/
+        
 
         // Newton: x = x - f(x) / f'(x)
         //x += min(4, abs(res[0] / res[1]));
@@ -172,8 +200,20 @@ float raymarch(vec3 rayDir, inout vec3 rayOrigin) {
         
         
         //x += min(4., abs(f / length(res.xyz)));
-        x+= abs(f / length(res.xyz));
+        
+        /*if(x>100.){
+            //debugcolor(vec2(float(i+1)/60.,0.).xxy);
+            //debugcolor(vec3(0.,0.,float(i+1)/10.));
+            break;
+        }*/
+        //if(i==55)debugcolor(vec3((dx)));
+        /*if(dx==0.||i==59){
+            //debugcolor(vec3(float(i+1)/60.));
+            //debugcolor(vec3(float(i+1)/60.,log2(res.w)/256.+0.5,log2(dx)/256.+0.5));
+            break;
+        }*/
 
+        //x += min(4., abs(max(f-00.01,0.) / (length(2.*res.xyz)+0.01)));
 
     }
     x=bestx;
@@ -193,7 +233,7 @@ float raymarch(vec3 rayDir, inout vec3 rayOrigin) {
         //x += -2. * res[0] * res[1] / (2. * res[1] * res[1] - res[0] * res[2]);
 
         //x += min(4, (f / length(res.xyz))*sign(dot(res.xyz,rayDir)));
-        x -= res.w / (dot(res.xyz,rayDir));
+        x -= res.w / dot(res.xyz,rayDir);
 
     }*/
 
@@ -213,10 +253,11 @@ void main() {
     // Sphere tracing
 
     vec3 p=rayOrigin;//vec3(0);//rayOrigin;
-    float dist=raymarch(rayDir,p);
-    //float dist=raymarch4(rayDir,p);
+    float dist=DualxyzRaymarch(rayDir,p);
+    //float x=dot(rayDir,p-rayOrigin);
+    //debugcolor(vec3((x)/10.));
+    //float dist=DualxyzRaymarch4(rayDir,p);
     //p=(cameraMatrix)*p+rayOrigin;
-    
 
 
         
