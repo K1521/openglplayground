@@ -2,7 +2,7 @@
 /*source=part1*/
 
 const int polybasislength=15;
-const int numpolys=1;
+const int numpolys=5;
 //const int MAXPOLYDEGREE=4;
 
 /*source=part0*/

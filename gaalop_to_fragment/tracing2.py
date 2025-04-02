@@ -63,7 +63,7 @@ def remove_rows_by_rankQR(matrix):
 def funtoviz(point):
     obj=dcga.toroid(2,0.5)
     #obj=dcga.Plane(1,1,1,0.01)
-    #obj=dcga.Plane(1,3,2,0.5).outer(dcga.toroid(2,0.5))
+    obj=dcga.Plane(1,3,2,0.5).outer(dcga.toroid(2,0.5))
     #obj=dcga.Plane(1,1,1,0.01).inner(dcga.toroid(2,0.5))
 
     #obj=sanwich(t,obj)
@@ -76,6 +76,8 @@ funmat=tracer.trace_linear(funtoviz)
 # print(m@m.T)
 print(funmat.shape,np.linalg.matrix_rank(funmat.T))
 #funmat=remove_duplicate_rows(funmat)
+print(repr(funmat))
+
 funmat=remove_rows_by_rankQR(funmat)/5
 print(funmat.shape,np.linalg.matrix_rank(funmat.T))
 #print(funmat)
